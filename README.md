@@ -19,9 +19,6 @@ bash script that makes using zerotier-cli easier.
 
 **or get it at: https://www.zerotier.com/download/**
 
-**(screenshot of official download page):**
-
-![zerotier_download-debian](https://github.com/ConzZah/ZeroTierConnect.sh/assets/69615452/374abe55-23b7-4b74-88d4-b7238883117d)
 
 
 Cheers, 
