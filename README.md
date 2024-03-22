@@ -1,8 +1,25 @@
 # ZeroTierConnect.sh
 bash script that makes using zerotier-cli easier.
 
-**v0.3 Screenshot:** 
+**v0.4 Screenshot:** 
 
-![image](https://github.com/ConzZah/ZeroTierConnect.sh/assets/69615452/62ef7f09-0623-4e96-9b66-57f376ee4a9c)
+![v0 4_screenshot](https://github.com/ConzZah/ZeroTierConnect.sh/assets/69615452/733687c8-9d10-4266-83ef-c0e6c28a1d8d)
 
-(readme.md under construction)
+## Requirements:
+
+![linux_cracksmokertuxXD](https://github.com/ConzZah/ZeroTierConnect.sh/assets/69615452/67295c91-6437-4ba6-a52b-aa1bd71ce3dd)
+
+**- Linux (obviously lol)**
+
+**- ZeroTier Client**
+
+![image](https://github.com/ConzZah/ZeroTierConnect.sh/assets/69615452/44c95bcf-0d49-492f-b72b-bb6ff28948f6)
+
+get it @: https://www.zerotier.com/download/
+
+**(screenshot of official zerotier download page):
+**
+![zerotier_download-debian](https://github.com/ConzZah/ZeroTierConnect.sh/assets/69615452/374abe55-23b7-4b74-88d4-b7238883117d)
+
+or compile it yourself: https://github.com/zerotier/ZeroTierOne
+
