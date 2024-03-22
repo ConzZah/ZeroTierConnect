@@ -15,11 +15,15 @@ bash script that makes using zerotier-cli easier.
 
 ![image](https://github.com/ConzZah/ZeroTierConnect.sh/assets/69615452/44c95bcf-0d49-492f-b72b-bb6ff28948f6)
 
-get it @: https://www.zerotier.com/download/
+**compile it yourself: https://github.com/zerotier/ZeroTierOne**
 
-**(screenshot of official zerotier download page):
-**
+**or get it at: https://www.zerotier.com/download/**
+
+**(screenshot of official download page):**
+
 ![zerotier_download-debian](https://github.com/ConzZah/ZeroTierConnect.sh/assets/69615452/374abe55-23b7-4b74-88d4-b7238883117d)
 
-or compile it yourself: https://github.com/zerotier/ZeroTierOne
 
+Cheers, 
+
+**ConzZah / 2024**
