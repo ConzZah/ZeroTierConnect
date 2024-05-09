@@ -1,8 +1,9 @@
 #!/bin/bash
-  #======================================
-  # Project: zerotier-connect_v0.5
-  # Author:  ConzZah
-  #======================================
+  #============================================
+  # Project: zerotier-connect_v0.5x
+  # Author:  ConzZah / ©️ 2024
+  # https://github.com/ConzZah/ZeroTierConnect
+  #============================================
   #####################################
   # // SETTING ESSENTIAL FUNCTIONS //
   #####################################
@@ -11,9 +12,9 @@ function Logo {
 clear
 echo " .:*======= ConzZah's =======*:."
 echo " ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-echo " *    ZEROTIER-CONNECT_v0.5     *"
+echo " *    ZEROTIER-CONNECT_v0.5x    *"
 echo " ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-#echo "[ LAST CHANGE TO CODE @ 05.05.2024 / 22:45 ]"
+#echo "[ LAST CHANGE TO CODE @ 09.05.2024 / 05:00 ]"
 echo ""
 status_screen; echo ""
 }
@@ -25,17 +26,26 @@ if [[ "$zt_install_check" == "" ]]; then echo "$error_msg"; echo ""; ask2install
 }
 # ask2install_zerotier_client <--  (asks user if they want to install the zerotier client if it hasnt been detected.)
 function ask2install_zerotier_client {
-install_msg="[ ::: DOWNLOADING & INSTALLING ZEROTIER FROM: https://install.zerotier.com ::: ]"
-pls_wait="[ ::: PLEASE WAIT ::: ]"
-post_install_msg="[ INSTALL FINISHED. PRESS ANY KEY TO LAUNCH ZTC ]"
 select yn in "INSTALL ZEROTIER" "EXIT"; do
 	case $yn in
-	"INSTALL ZEROTIER" ) echo ""; echo "$install_msg"; echo ""; echo "$pls_wait"
-	install_zerotier_client=$(curl -s https://install.zerotier.com | sudo bash)
-	echo ""; echo "$post_install_msg"; read -n 1 -s; break;;
+	"INSTALL ZEROTIER" ) zt_installer; break;;
 	"EXIT" ) exit; break;;
 	esac
 done
+}
+# zt_installer
+function zt_installer {
+install_msg="[ ::: DOWNLOADING & INSTALLING ZEROTIER FROM: https://install.zerotier.com ::: ]"
+pls_wait="[ ::: PLEASE WAIT ::: ]"
+post_install_msg="[ INSTALL FINISHED. PRESS ANY KEY TO LAUNCH ZTC ]"
+no_curl="[ ::: ERROR: MISSING DEPENDENCY: CURL ::: ]"
+curl_install="[ ::: INSTALLING DEPENDENCY: CURL :::]"
+curl_post_install="[ ::: INSTALLED DEPENDENCY: CURL. :::]"
+command -v curl >/dev/null 2>&1 || { echo ""; echo "$no_curl"; echo ""; echo "$curl_install"; echo ""
+sudo apt install curl; echo ""; echo "$curl_post_install"; echo ""; }
+echo ""; echo "$install_msg"; echo ""; echo "$pls_wait"; echo ""
+install_zerotier_client=$(curl -s https://install.zerotier.com | sudo bash)
+echo ""; echo "$post_install_msg"; echo ""; read -n 1 -s
 }
 # status_screen
 function status_screen {
@@ -69,16 +79,34 @@ saved_id=$saved_id__current
 saved_alias=$saved_alias__current
 actual_netname=$actual_netname__current
 }
+# store__lcn
+# stores last connected network values in .txt files to reload them when needed.
+function store__lcn {
+if [ ! -d ~/ZTC_Save/LCN ]; then mkdir LCN; fi; cd ~/ZTC_Save/LCN
+echo "$input_id" > lcn__input_id.txt
+echo "$saved_alias" > lcn__saved_alias.txt
+echo "$actual_netname" > lcn__actual_netname.txt
+cd ~/ZTC_Save/
+}
+# recall__lcn
+# recalls last connected network values into their variables
+function recall__lcn {
+if [ ! -d ~/ZTC_Save/LCN ]; then mkdir LCN; init_status; fi; cd ~/ZTC_Save/LCN
+input_id=$(<lcn__input_id.txt)
+saved_alias=$(<lcn__saved_alias.txt)
+actual_netname=$(<lcn__actual_netname.txt)
+cd ~/ZTC_Save/
+}
 # fetch_actual_netname <--- (fetching network name 3 times & sleeping 3 seconds. otherwise, fails to update / display properly.)
 function fetch_actual_netname {
-cnbf="NAME COULD NOT BE FETCHED, ARE YOU AUTHORIZED?"
+cnbf="UNABLE TO FETCH NAME, ARE U AUTHORIZED?"
 echo "[ ::: FETCHING NETWORK NAME ::: ]"; echo "";
 actual_netname=$(sudo zerotier-cli get $input_id name); sleep 1 # <-- ( try 1 )
 actual_netname=$(sudo zerotier-cli get $input_id name); sleep 1 # <-- ( try 2 )
 actual_netname=$(sudo zerotier-cli get $input_id name); sleep 1 # <-- ( try 3 )
 if [[ "$actual_netname" == "" ]]; then actual_netname="$cnbf"; fi
 if [[ "$actual_netname" == "$cnbf" ]]; then sleep 1; echo ""; echo "[ ERROR: $cnbf ]"; echo ""; fi
-# if network name could not be fetched after 3 tries, update actual_netname and thus status_screen with: "NAME COULD NOT BE FETCHED."
+# ^ if network name could not be fetched after 3 tries, update actual_netname and thus status_screen with: "NAME COULD NOT BE FETCHED."
 }
 # if_network_not_present__fail
 function if_network_not_present__fail {
@@ -93,32 +121,36 @@ valid_check__input_id=$(sudo zerotier-cli join $input_id )
 error_msg="[ [ERROR]: $valid_check__input_id. PRESS ANY KEY TO TRY AGAIN. ]"
 # if user enters "q", quit to main menu
 if [[ "$input_id" == "q" ]]; then recall__current_status; return2main_menu; fi
+# check if network id is invalid. if it is, echo error message, recall current status and reload ManualInput
 if [[ "$valid_check__input_id" == "invalid network id" ]]; then echo "$error_msg"
 read -n 1 -s; recall__current_status; Logo; ManualInput
-fi # check if network id is invalid. if it is, echo error message, recall current status and reload ManualInput
+fi
+# gets triggered when user enters nothing & restores state from backup variables
+if [[ "$input_id" == "" ]]; then echo "$error_msg"; echo ""; read -n 1 -s; recall__current_status; ManualInput
+fi
 }
 # check4invalid__saved_id <-- ( error check for: "CreateNewSave" )
 function check4invalid__saved_id {
 valid_check__saved_id=$(sudo zerotier-cli join $saved_id )
 error_msg="[ [ERROR]: $valid_check__saved_id. PRESS ANY KEY TO TRY AGAIN. ]"
-# if user enters "q", quit to main menu
-if [[ "$saved_id" == "q" ]]; then recall__current_status; return2main_menu; fi
+if [[ "$saved_id" == "q" ]]; then recall__current_status; return2main_menu; fi # <-- if user enters "q", quit to main menu
+# check if network id is invalid. if it is, echo error message, recall current status and reload CreateNewSave
 if [[ "$valid_check__saved_id" == "invalid network id" ]]; then echo "$error_msg"
 read -n 1 -s; recall__current_status; Logo; CreateNewSave
-fi # check if network id is invalid. if it is, echo error message, recall current status and reload CreateNewSave
+fi
 }
 # check4invalid__saved_alias <-- ( error check for: "LoadFromSave" )
 function check4invalid__saved_alias {
-error_msg="$saved_alias doesn't exist. press any key to try again."
-# if user enters "q", quit to main menu
-if [[ "$saved_alias" == "q" ]]; then recall__current_status; return2main_menu; fi
-if [ ! -f ~/ZTC_Save/$saved_alias.txt ]; then echo "$error_msg"; read -n 1 -s; recall__current_status; Logo; LoadFromSave; fi
+error_msg="[ ERROR: $saved_alias doesn't exist. press any key to try again. ]"
+if [[ "$saved_alias" == "q" ]]; then recall__current_status; return2main_menu; fi # <-- if user enters "q", quit to main menu
+if [ ! -f ~/ZTC_Save/SAVED_NETWORKS/$saved_alias.txt ]; then echo "$error_msg"; read -n 1 -s; recall__current_status; Logo; LoadFromSave; fi
 }
 # InitialRun <--- (only gets called if no savefile is detected)
 function InitialRun {
-init_status
 # cd's to savepath and, if not present, creates savefolder.
 cd ~; if [ ! -d ~/ZTC_Save ]; then mkdir ZTC_Save; fi; cd ZTC_Save
+if [ ! -d ~/ZTC_Save/SAVED_NETWORKS ]; then mkdir SAVED_NETWORKS; fi
+init_status
 CreateNewSave
 } #################################
   # // ESSENTIAL FUNCTIONS SET //
@@ -135,8 +167,6 @@ echo "/// CONNECT TO NETWORK ID"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
 echo "[ ~~~ paste network-id ~~~ ]"; echo ""
 read input_id
-if [[ "$input_id" == "" ]]; then echo "$error_msg"; echo ""; read -n 1 -s; recall__current_status; ManualInput
-fi # <-- gets triggered when user enters nothing & falls back to value stored in saved_id
 check4invalid__input_id
 echo "~~~~~~~~~~~~~~~~";
 sudo zerotier-cli join $input_id
@@ -146,14 +176,16 @@ saved_alias="NONE SELECTED"
 fetch_actual_netname
 echo "[ STATUS UPDATED: ]"; echo ""
 status_screen
+store__lcn
 return2main_menu
 }
 #2 LoadFromSave
 function LoadFromSave {
 store__current_status
+cd ~/ZTC_Save/SAVED_NETWORKS
 echo "/// CONNECT TO SAVED NETWORK"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
-echo "[ SAVEFILE FOUND ]"
+echo "[ SAVEFILE FOUND ]"; echo ""
 echo "~~~~~~~~~~~~~~~~~~"
 cat alias_index.txt
 echo "~~~~~~~~~~~~~~~~~~"; echo ""
@@ -167,12 +199,15 @@ input_id=$saved_id # <-- syncs value in saved_id to input_id
 echo "~~~~~~~~~~~~~~~~"; echo ""
 fetch_actual_netname
 echo "[ STATUS UPDATED: ]"; echo ""
+cd ~/ZTC_Save/
 status_screen
+store__lcn
 return2main_menu
 }
 #3 CreateNewSave
 function CreateNewSave {
 store__current_status
+cd ~/ZTC_Save/SAVED_NETWORKS
 echo "/// CREATE NEW SAVED NETWORK"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
 echo "[ ~~~ paste network-id ~~~ ]"; echo ""
@@ -184,7 +219,9 @@ input_id=$saved_id # <-- syncs value in saved_id to input_id
 echo "[ .:SAVE CREATED:. ]"; echo ""
 fetch_actual_netname
 echo "[ STATUS UPDATED: ]"; echo ""
+cd ~/ZTC_Save/
 status_screen
+store__lcn
 return2main_menu
 }
 #4 CheckClientInfo
@@ -219,13 +256,12 @@ return2main_menu
 }
 #8 get_net_settings
 function get_net_settings {
-# /// setting variables
+# /// getting network settings / rules
 allow_dns_status=$(sudo zerotier-cli get $input_id allowDNS)
 allow_default_status=$(sudo zerotier-cli get $input_id allowDefault)
 allow_global_status=$(sudo zerotier-cli get $input_id allowGlobal)
 allow_managed_status=$(sudo zerotier-cli get $input_id allowManaged)
 ip_status=$(sudo zerotier-cli get $input_id ip)
-# /// variables set
 echo "// GET NETWORK SETTINGS FOR $input_id:"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
 echo "Allow DNS: $allow_dns_status"; echo ""
@@ -266,7 +302,6 @@ done
 function status_menu {
 echo "// CHECK STATUS"
 echo "~~~~~~~~~~~~~~~~~"
-if_network_not_present__fail
 select llccr in "LIST CONNECTED NETWORKS" "LIST CONNECTED PEERS" "CHECK CLIENT INFO" "CHECK IP ADDRESS" "RETURN TO MAIN MENU"; do
     case $llccr in
 	"LIST CONNECTED NETWORKS" ) clear; Logo; CheckConnectedNetworks; break;;
@@ -292,16 +327,18 @@ done
 }
 # disconnection_menu ( sub menu 4 )
 function disconnection_menu {
-echo "/// DISCONNECT FROM NETWORK"
+echo "// DISCONNECT FROM NETWORK"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
-select dcr in "DC FROM $input_id" "DC FROM OTHER NETWORK" "RETURN TO MAIN MENU"; do
+select dcr in "DC FROM $input_id" "DC FROM ANOTHER NETWORK" "RETURN TO MAIN MENU"; do
 	case $dcr in
 	"DC FROM $input_id" ) sudo zerotier-cli leave $input_id; break;;
-	"DC FROM OTHER NETWORK" ) sudo zerotier-cli listnetworks; echo""; echo "[ ~~~ paste network-id ~~~ ]"; read disconnect; sudo zerotier-cli leave $disconnect; break;;
+	"DC FROM ANOTHER NETWORK" ) sudo zerotier-cli listnetworks; echo""; 
+	echo "[ ~~~ paste network-id ~~~ ]"; read disconnect; sudo zerotier-cli leave $disconnect; break;;
 	"RETURN TO MAIN MENU" ) return2main_menu; break;;
 	esac
 done
 init_status
+store__lcn
 return2main_menu
 }
 # return2get_set_menu
@@ -338,6 +375,6 @@ done
   ###################################################
 # checks if zerotier is installed & if alias_index.txt exists - if not present, script will call InitialRun.
 clear; check4installed_zerotier_client
-if [ ! -f ~/ZTC_Save/alias_index.txt ]; then Logo; echo "[ ERROR ]: NO SAVEDATA FOUND.  ]"; echo ""; InitialRun; fi
-cd ~; cd ZTC_Save # <-- cd's to working / save directory
-init_status; main_menu # <--  ( //LAUNCH\\ )
+if [ ! -f ~/ZTC_Save/SAVED_NETWORKS/alias_index.txt ]; then echo "[ ERROR ]: NO SAVEDATA FOUND.  ]"; echo ""; InitialRun; fi
+cd ~; cd ZTC_Save # <-- cd's to save directory
+init_status; recall__lcn; main_menu # <--  ( //LAUNCH\\ )
