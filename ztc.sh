@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
   #============================================
-  # Project: zerotier-connect_v0.7
+  # Project: zerotier-connect_v0.7 [fix #1]
   # Author:  ConzZah / ©️ 2024
   # https://github.com/ConzZah/ZeroTierConnect
   #============================================
@@ -11,7 +11,7 @@ echo " .:*======= ConzZah's =======*:."
 echo " ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 echo " *    ZEROTIER-CONNECT_v0.7     *"
 echo " ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-#echo "[ LAST CHANGE TO CODE @ 24.06.2024 / 18:32 ]"
+#echo "[ LAST CHANGE TO CODE @ 24.06.2024 / 20:42 ]"
 echo ""
 status_screen; echo ""
 }
@@ -29,8 +29,7 @@ echo "Q) EXIT"
 echo ""; read -r ask2installZT
 case $ask2installZT in
 	1) zt_installer;;
-	q) echo ""; echo "// EXIT"; exit;;
-	Q) echo ""; echo "// EXIT"; exit;;
+	q|Q) echo ""; echo "// EXIT"; exit;;
 	*) clear; check4installed_zerotier_client
 esac
 }
@@ -44,7 +43,7 @@ ZT_done_msg="[ INSTALL FINISHED. PRESS ANY KEY TO LAUNCH ZTC ]"
 curl_missing_msg="[ ::: ERROR: MISSING DEPENDENCY: CURL ::: ]"
 curl_done_msg="  [ ::: INSTALLED DEPENDENCY: CURL. :::]"
 command -v curl >/dev/null 2>&1 || { echo ""; echo "$curl_missing_msg"
-$_doso $add $_y curl >/dev/null 2>&1; echo ""; } #dependency check 4 curl
+$_doso "$add" $_y curl >/dev/null 2>&1; echo ""; } #dependency check 4 curl
 echo ""; echo "$zt_install_msg0"; echo ""
 ZTinstall=$(curl -s https://install.zerotier.com | $_doso bash) # default install through official script
 echo ""; echo "$ZT_done_msg"; echo ""; read -r -n 1 -s
@@ -416,7 +415,10 @@ esac
 }
 #####################################################
 # shortcuts:
+_doso="sudo"
+add="apt get install"
 _ztc="zerotier-cli"
+_y="-y"
 _i="info" 
 _j="join"
 _l="leave"
@@ -442,8 +444,6 @@ echo "tun" > zerotier-one.conf; doas mv -f zerotier-one.conf /usr/lib/modules-lo
 doas rc-update add zerotier-one; doas rc-service zerotier-one start # adds zerotier-one service and starts it. 
 doas zerotier-one -d >/dev/null 2>&1; sleep 3; echo ""; echo ""; echo "[ PRESS ANY KEY TO START ZTC ]"; echo ""; read -r -n 1 -s
 }
-_y="-y"
-_doso="sudo"
 add_alpine="apk add"
 is_alpine=$(uname -v|grep -o -w Alpine)
 if [[ "$is_alpine" == "Alpine" ]]; then add="$add_alpine"; _doso="doas"; fi
