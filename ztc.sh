@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
   #============================================
-  # Project: zerotier-connect_v0.7 [fix #1]
+  # Project: zerotier-connect_v0.7 [patch #2]
   # Author:  ConzZah / ©️ 2024
   # https://github.com/ConzZah/ZeroTierConnect
   #============================================
@@ -11,7 +11,7 @@ echo " .:*======= ConzZah's =======*:."
 echo " ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 echo " *    ZEROTIER-CONNECT_v0.7     *"
 echo " ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-#echo "[ LAST CHANGE TO CODE @ 24.06.2024 / 20:42 ]"
+#echo "[ LAST CHANGE TO CODE @ 25.06.2024 / 21:21 ]"
 echo ""
 status_screen; echo ""
 }
@@ -43,7 +43,7 @@ ZT_done_msg="[ INSTALL FINISHED. PRESS ANY KEY TO LAUNCH ZTC ]"
 curl_missing_msg="[ ::: ERROR: MISSING DEPENDENCY: CURL ::: ]"
 curl_done_msg="  [ ::: INSTALLED DEPENDENCY: CURL. :::]"
 command -v curl >/dev/null 2>&1 || { echo ""; echo "$curl_missing_msg"
-$_doso "$add" $_y curl >/dev/null 2>&1; echo ""; } #dependency check 4 curl
+$_doso "$_add" $_y curl >/dev/null 2>&1; echo ""; } #dependency check 4 curl
 echo ""; echo "$zt_install_msg0"; echo ""
 ZTinstall=$(curl -s https://install.zerotier.com | $_doso bash) # default install through official script
 echo ""; echo "$ZT_done_msg"; echo ""; read -r -n 1 -s
@@ -124,6 +124,8 @@ if [[ "$input_id" == "NONE SELECTED" ]]; then echo ""; echo "$error_msg"; echo "
 if [[ "$input_id" == "" ]]; then echo ""; echo "$error_msg"; echo ""; return2main_menu; fi
 # will be triggered if variable input_id is set to starting value OR none at all.
 }
+# check4save <-- checks if savedata exists & cds to savedir
+function check4save { if [ ! -f ~/ZTC_Save/SAVED_NETWORKS/alias_index.txt ]; then echo "[ ERROR ]: NO SAVEDATA FOUND.  ]"; echo ""; InitialRun; fi; cd ~/ZTC_Save; }
 # check4invalid__input_id <-- ( error check for: "ManualInput" )
 function check4invalid__input_id {
 valid_check__input_id=$($_doso "$_ztc" "$_j" $input_id )
@@ -166,13 +168,7 @@ sed '/^$/d' ~/ZTC_Save/SAVED_NETWORKS/raw_alias_index.txt > alias_index.txt
 rm raw_alias_index.txt
 }
 # InitialRun <--- (only gets called if no savefile is detected)
-function InitialRun {
-# cd's to savepath and, if not present, creates main savefolder.
-cd ~; if [ ! -d ~/ZTC_Save ]; then mkdir ZTC_Save; fi; cd ZTC_Save
-if [ ! -d ~/ZTC_Save/SAVED_NETWORKS ]; then mkdir SAVED_NETWORKS; fi
-init_status
-CreateNewSave
-}
+function InitialRun { cd /home/$USER; mkdir -p ~/ZTC_Save/SAVED_NETWORKS; cd ~/ZTC_Save/SAVED_NETWORKS; init_status; CreateNewSave; }
 # ManualInput
 function ManualInput {
 action="ManualInput"
@@ -375,9 +371,9 @@ echo "2) DC FROM ANOTHER NETWORK"
 echo "Q) RETURN TO MAIN MENU"
 echo ""; read -r disconnection_menu
 case $disconnection_menu in
-	1) $ui1; $_doso "$_ztc" $_l $input_id; $ui1;;
+	1) echo ""; echo "$ui1"; $_doso "$_ztc" $_l $input_id; echo "$ui1";;
 	2) $_doso "$_ztc" "$_lnw"; echo ""; echo "[ ~~~ paste network-id ~~~ ]"; 
-	echo ""; read -r dc_other; $ui1; $_doso "$_ztc" $_l $dc_other; $ui1;;
+	echo ""; read -r dc_other; echo ""; echo "$ui1"; $_doso "$_ztc" $_l $dc_other; echo "$ui1";;
 	q|Q) return2main_menu;;
 	*) clear; Logo; disconnection_menu
 esac
@@ -416,7 +412,7 @@ esac
 #####################################################
 # shortcuts:
 _doso="sudo"
-add="apt get install"
+_add="apt get install"
 _ztc="zerotier-cli"
 _y="-y"
 _i="info" 
@@ -428,29 +424,19 @@ ui1="~~~~~~~~~~~~~~~~~~"
 #	ALPINE INTEGRATION
 #########################
 function compile4alpine {
-  #================================================
-  # Project: ZeroTier_AutoCompile-Alpine.sh
-  # Author:  ConzZah / ©️ 2024
-  # Last Modification: 23.06.2024 / 13:32 [v0.1]
-  #================================================
 wd=$(pwd); cd /home/$USER; mkdir -p ZeroTier_AutoCompile-Alpine; cd ZeroTier_AutoCompile-Alpine
 doas apk add git wget build-base clang rust cargo make linux-headers openssl-dev nodejs nodejs-dev # installs dependencies for zerotier compilation
 git clone https://github.com/zerotier/ZeroTierOne; cd ZeroTierOne # clones zerotier-one from github
-doas make && echo ""; echo "DONE COMPILING!"; echo "" # runs make and shows message when done
+doas make && echo ""; echo "DONE COMPILING!"; echo ""; echo "ENTER PASSWORD TO INSTALL ZEROTIER"; echo ""; # runs make and shows message when done
 doas make install && echo ""; echo "DONE INSTALLING, SETTING UP INIT SCRIPT.."; echo "" # runs make install and shows message when done
 cd /home/$USER; doas rm -rf ZeroTier_AutoCompile-Alpine # removes working dir to save space since the binaries are compiled & installed by that point
 cd /etc/init.d; doas wget -q -O zerotier-one https://raw.githubusercontent.com/ConzZah/ZeroTier_AutoCompile-Alpine/main/zerotier-one.initd; doas chmod 755 zerotier-one; cd $wd # installs init script
 echo "tun" > zerotier-one.conf; doas mv -f zerotier-one.conf /usr/lib/modules-load.d/; doas modprobe tun; lsmod | grep tun
 doas rc-update add zerotier-one; doas rc-service zerotier-one start # adds zerotier-one service and starts it. 
-doas zerotier-one -d >/dev/null 2>&1; sleep 3; echo ""; echo ""; echo "[ PRESS ANY KEY TO START ZTC ]"; echo ""; read -r -n 1 -s
+doas zerotier-one -d >/dev/null 2>&1; sleep 3; echo ""; echo ""; echo "[ PRESS ANY KEY TO START ZTC ]"; echo ""; read -r -n 1 -s; check4save; _launch
 }
 add_alpine="apk add"
 is_alpine=$(uname -v|grep -o -w Alpine)
-if [[ "$is_alpine" == "Alpine" ]]; then add="$add_alpine"; _doso="doas"; fi
-#####################################################
-# /// everything is set /// starting launch prep ///
-#####################################################
-# checks if zerotier is installed & if alias_index.txt exists - if not present, script will call InitialRun.
-clear; check4installed_zerotier_client; if [ ! -f ~/ZTC_Save/SAVED_NETWORKS/alias_index.txt ]; then echo "[ ERROR ]: NO SAVEDATA FOUND.  ]"; echo ""; InitialRun; fi
-cd ~/ZTC_Save # <-- cd's to save directory
-init_status; recall__lcn; main_menu # <--  ( //LAUNCH\\ )
+if [[ "$is_alpine" == "Alpine" ]]; then _add="$add_alpine"; _doso="doas"; fi
+################################################################################
+function _launch { clear; check4installed_zerotier_client; check4save; init_status; recall__lcn; main_menu; }; _launch  # <--  ( //LAUNCH\\ )
