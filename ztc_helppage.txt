@@ -1,0 +1,28 @@
+=========== ZTC HELPPAGE ===========
+
+
+- h     Display this Page
+
+- q     Exit to Main Menu, Cancel Text Entry or Quit ZTC.
+
+- c     Connect to ZT Networks
+
+- dc    Disconnect from ZT Networks
+
+- dl    Delete a Saved Network (will also leave network if it's deleted)
+
+- r     Reconnect / Refresh Network Connections
+
+- i     Display info about currently selected network
+
+- qr    Generate QR-Code for currently selected network  
+
+- ln    Display all currently connected ZT Networks
+
+- lp    Display all currently connected peers
+
+- ci    Display ZT Client info (Version, Client-ID, Online State)
+
+
+
+ZTC - Copyright ©️ 2024 ConzZah (MIT License)
