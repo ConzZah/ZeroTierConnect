@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
   #===============================================
-  # Project: zerotier-connect_v0.7x
+  # Project: zerotier-connect_v0.7.2
   # Author:  ConzZah / ©️ 2024
-  # Last Modification: 30.08.2024 / 16:54 [v0.7x]
+  # Last Modification: 12.10.24 / 21:55 [v0.7.2]
   # https://github.com/ConzZah/ZeroTierConnect
   #===============================================
 # check4installed_zerotier_client <-- ( checks if zerotier is installed )
@@ -21,9 +21,8 @@ esac
 }
 # zt_installer <-- ( downloads & installs zerotier client binarys through https://www.zerotier.com/download/. Also, if you're on Alpine Linux, it will ask you to build from source. )
 function zt_installer {
-if [[ "$is_alpine" == "Alpine" ]]; then clear; echo "ALPINE DETECTED"; echo ""; ask2compile4alpine; fi 
+if [[ "$pm" == "apk" ]]; then clear; echo "ALPINE DETECTED"; echo ""; ask2compile4alpine; fi
 _dlmsg="[ ::: DOWNLOADING & INSTALLING ZEROTIER, PLEASE WAIT.. ::: ]"; ZT_done_msg="[ ZEROTIER INSTALL FINISHED. PRESS ANY KEY TO LAUNCH ZTC ]"
-(type -p curl >/dev/null || ( $_doso "$_add" curl )) # checks if curl is available on your system. if not, install.
 echo ""; echo "$_dlmsg"; echo ""; ZTinstall=$(curl -s https://install.zerotier.com | $_doso bash) # default install through official script
 echo ""; echo "$ZT_done_msg"; echo ""; read -r -n 1 -s; _launch
 }
@@ -52,7 +51,7 @@ doas zerotier-one -d >/dev/null 2>&1; sleep 3; echo ""; echo ""; echo "[ PRESS A
 function Logo { clear
 echo "   .:*======= ConzZah's =======*:."
 echo " $t1$t1"
-echo " *      ZEROTIER-CONNECT v0.7x      *"
+echo " *     ZEROTIER-CONNECT v0.7.2      *"
 echo " $t1$t1"; status_screen
 }
 # status_screen
@@ -200,10 +199,12 @@ case $DeleteSave in
 	*) Logo; DeleteSave
 esac 
 }
-# nwqr <-- creates qr code for currently selected network id ( uses curl & qrenco.de )
+# nwqr <-- creates qr code for currently selected network id ( uses local qrencode instead of qrenco.de as of v0.7.2 )
 function nwqr { 
-if_network_not_present__fail; clear; echo "QR CODE FOR NETWORK ID: $input_id"; _nwqr="https://joinzt.com/addnetwork?nwid=$input_id&v=1"
-curl qrenco.de/$_nwqr; echo ""; _r2main="manual"; return2main_menu
+if_network_not_present__fail; clear; echo "QR CODE FOR NETWORK ID: $input_id"; echo "";
+_nwqr="https://joinzt.com/addnetwork?nwid=$input_id&v=1"
+qrencode -m 2 -t utf8 <<< "$_nwqr"; echo ""; nwqr=""
+_r2main="manual"; return2main_menu
 }
 # CheckClientInfo
 function CheckClientInfo {
@@ -280,20 +281,30 @@ case $main_menu in
 	*) main_menu
 esac
 }
+##########################################################
 # important vars
 _doso="sudo"
 _home="/home/$USER"
-_add="apt get install -y"
 _ztc="zerotier-cli"
-_i="info" 
+_i="info"
 _j="join"
 _l="leave"
 _lnw="listnetworks"
 _dmsg="[ ~~~ DONE ~~~ ]"
 t1="~~~~~~~~~~~~~~~~~~"
+# determine package manager & check for missing dependencies (curl & qrencode)
+clear; echo "CHECKNG FOR MISSING DEPENDENCIES.."; echo ""; _qrencode="qrencode"
+i=0; bin=("apt" "apk" "dnf" "yum" "pacman" "zypper" "brew"); pm="" 
+while [ $i -lt ${#bin[@]} ]; do
+if type -p "${bin[$i]}" > /dev/null; then pm="${bin[$i]}"; _add="$pm install"; break; fi
+((i++))
+done
+_qrencode="qrencode"
+if [[ "$pm" == "apk" ]]; then _doso="doas"; _add="apk add"; _qrencode="libqrencode-tools"; fi
+if [[ "$pm" == "pacman" ]]; then _add="pacman -S"; fi
+(! type -p curl >/dev/null && $_doso $_add)
+(! type -p qrencode  >/dev/null && $_doso $_add $_qrencode)
+_cr='\033[0m'; red='\033[0;31m'; green='\033[0;32m'; blue='\033[0;34m' # <-- basic colors
 if [ "$EUID" -eq 0 ]; then _home="/root"; fi # <-- if user is root, changes $_home from "/home/$USER" to "/root" ( this also means that root has it's own savedir )
-is_alpine=$(uname -v|grep -o -w Alpine); add_alpine="apk add"
-if [[ "$is_alpine" == "Alpine" ]]; then _add="$add_alpine"; _doso="doas"; fi # <-- if ran on alpine, set variables for alpine 
-_cr='\033[0m'; red='\033[0;31m'; green='\033[0;32m'; blue='\033[0;34m'; # <-- basic colors
 # _launch
-function _launch { clear; check4installed_zerotier_client; pingtest; check4save; init_status; recall__lcn; main_menu; }; _launch  # <--  ( //LAUNCH\\ )
+function _launch { clear; pingtest; check4installed_zerotier_client; check4save; init_status; recall__lcn; main_menu; }; _launch  # <--  ( //LAUNCH\\ )
