@@ -2,7 +2,7 @@
   #===============================================
   # Project: zerotier-connect_v0.7.2 / patch #2 
   # Author:  ConzZah / ©️ 2024
-  # Last Modification: 13.10.24 / 09:15 [v0.7.2]
+  # Last Modification: 13.10.24 / 10:21 [v0.7.2]
   # https://github.com/ConzZah/ZeroTierConnect
   #===============================================
 # check4installed_zerotier_client <-- ( checks if zerotier is installed & calls pingtest )
@@ -284,11 +284,10 @@ _i="info"
 _j="join"
 _l="leave"
 _lnw="listnetworks"
+_qrencode="qrencode"
 _dmsg="[ ~~~ DONE ~~~ ]"
 t1="~~~~~~~~~~~~~~~~~~"
-# check_deps <-- determine package manager & check for missing dependencies (curl & qrencode)
-function check_deps {
-clear; echo "INSTALLING MISSING DEPENDENCIES.."; echo ""; _qrencode="qrencode"
+# determine package manager & set options where needed:
 i=0; bin=("apt" "apk" "dnf" "yum" "pacman" "zypper" "brew"); pm="" 
 while [ $i -lt ${#bin[@]} ]; do
 if type -p "${bin[$i]}" > /dev/null; then pm="${bin[$i]}"; _add="$pm install"; break; fi
@@ -296,9 +295,12 @@ if type -p "${bin[$i]}" > /dev/null; then pm="${bin[$i]}"; _add="$pm install"; b
 done
 if [[ "$pm" == "apk" ]]; then _doso="doas"; _add="apk add"; _qrencode="libqrencode-tools"; fi
 if [[ "$pm" == "pacman" ]]; then _add="pacman -S"; fi
+# check_deps <-- check for missing dependencies (curl & qrencode)
+function check_deps {
+echo "INSTALLING MISSING DEPENDENCIES.."; echo ""
 (! type -p curl >/dev/null && $_doso $_add curl)
 (! type -p qrencode  >/dev/null && $_doso $_add $_qrencode)
-}
+clear ;}
 _cr='\033[0m'; red='\033[0;31m'; green='\033[0;32m'; blue='\033[0;34m' # <-- basic colors
 if [ "$EUID" -eq 0 ]; then _home="/root"; fi # <-- if user is root, changes $_home from "/home/$USER" to "/root" ( this also means that root has it's own savedir )
 ##########  ARGS  ##########
