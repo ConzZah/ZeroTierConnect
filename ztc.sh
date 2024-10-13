@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
   #===============================================
-  # Project: zerotier-connect_v0.7.2
+  # Project: zerotier-connect_v0.7.2 / patch #1 
   # Author:  ConzZah / ©️ 2024
-  # Last Modification: 12.10.24 / 21:55 [v0.7.2]
+  # Last Modification: 13.10.24 / 05:00 [v0.7.2]
   # https://github.com/ConzZah/ZeroTierConnect
   #===============================================
-# check4installed_zerotier_client <-- ( checks if zerotier is installed )
+# check4installed_zerotier_client <-- ( checks if zerotier is installed & calls pingtest )
 function check4installed_zerotier_client {
-error_msg="[ [ERROR]: ZEROTIER COULD NOT BE FOUND. ]"; zt_install_check=$($_doso $_ztc $_i); clear
+error_msg="[ [ERROR]: ZEROTIER COULD NOT BE FOUND. ]"; zt_install_check=$($_doso $_ztc $_i); clear; pingtest
 if [[ "$zt_install_check" == "" ]]; then echo "$error_msg"; if [ ! -f /usr/sbin/zerotier-one ]; then echo ""; ask2install_zerotier_client; fi; fi
 }
 # ask2install_zerotier_client <--  ( asks user if they want to install the zerotier client if it hasnt been detected. )
@@ -64,18 +64,16 @@ echo -e "[ NETWORK ALIAS : $saved_alias ]"
 echo "$t1$t1$t1"; echo ""
 }
 # init_status
-function init_status { input_id="/"; saved_id="/"; saved_alias="/"; actual_netname="/";}
+function init_status { input_id="/"; saved_alias="/"; actual_netname="/";}
 # store__current_status <-- stores current status in backup variables so we can reload them in case a user error occurs.
 function store__current_status {
 input_id__current=$input_id
-saved_id__current=$saved_id
 saved_alias__current=$saved_alias
 actual_netname__current=$actual_netname
 }
 # recall__current_status <-- loads status values, previously stored with "store__current_status", back into their actual variables.
 function recall__current_status {
 input_id=$input_id__current
-saved_id=$saved_id__current
 saved_alias=$saved_alias__current
 actual_netname=$actual_netname__current
 }
@@ -109,12 +107,11 @@ function if_network_not_present__fail {
 error_msg="[ ~~~ [ERROR]: NO NETWORK SELECTED, TRY AGAIN. ~~~ ]"
 if [[ "$input_id" == "" || "$input_id" == "/" ]]; then echo "$error_msg"; echo ""; _r2main="manual"; return2main_menu; fi
 }
-# check4invalid__id ( check if user input given is an actual network id ) 
-# NOTE: must set _id2check=$input_id / _id2check=$saved_id BEFORE calling check4invalid__id.
+# check4invalid__id ( check if user input given is an actual network id )
 function check4invalid__id {
-_check_id=$($_doso $_ztc $_j $_id2check) # <-- checks if $_id2check is valid by trying to join it  
 error_msg="[ ERROR: INVALID NETWORK ID. PRESS ANY KEY TO TRY AGAIN. ]"
-if [[ "$_id2check" == "q" || "$_id2check" == "Q" ]]; then recall__current_status; return2main_menu; fi  # <-- quit to main_menu during text entry: if user enters "q / Q", recall last known network values & quit to main menu
+_check_id=$($_doso $_ztc $_j $input_id) # <-- checks if $input_id is valid by trying to join it  
+if [[ "$input_id" == "q" || "$input_id" == "Q" ]]; then recall__current_status; return2main_menu; fi  # <-- quit to main_menu during text entry: if user enters "q / Q", recall last known network values & quit to main menu
 if [[ "$_check_id" == "404"* || "$_check_id" == "invalid network id" ]]; then echo "$error_msg"; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # NOTE: $back2 refers to the function that it was called from.
 } 
 # check4invalid__alias 
@@ -126,7 +123,8 @@ if [[ "$saved_alias" == "" ]]; then echo "$_empty"; echo ""; read -r -n 1 -s; re
 if [ ! -f $_home/ZTC_Save/SAVED_NETWORKS/$saved_alias.txt ]; then echo "$doesnt_exist"; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # <-- if input does not match any saved networks, shows error and lets them try again
 }
 # pingtest <-- checks if your machine is connected to the internet by pinging zerotier.com before starting ztc
-function pingtest { echo "CHECKING NETWORK CONNECTION.."; echo ""; if ping -q -i 0.5 -c 2 -w 7 zerotier.com > /dev/null 2>&1; then echo "ONLINE"; else 
+function pingtest {
+echo "CHECKING NETWORK CONNECTION.."; echo ""; if ping -q -i 0.5 -c 2 -w 7 zerotier.com > /dev/null 2>&1; then echo "ONLINE"; clear; else 
 clear; echo "YOU'RE OFFLINE. CHECK YOUR CONNECTION & TRY AGAIN."; echo ""; echo "EXITING IN 3 SECONDS.."; echo ""; sleep 3; exit; fi; }
 # check4save <-- checks if savedata exists by checking if savedir is empty.
 function check4save { if [ -z "$( ls "$_home/ZTC_Save/SAVED_NETWORKS/" )" ]; then initial_run="1"; InitialRun; fi; }
@@ -143,34 +141,31 @@ if [[ "$_desc" == "$_error" ]]; then break; fi
 network_id=$(cat "$network_alias"); echo "$network_id   $network_alias"|cut -d'.' -f1 >> raw_$_index
 done; if [ -f raw_$_index ]; then sed '/^$/d' raw_$_index > $_index; cat $_index; echo ""; rm $_index; rm raw_$_index; fi
 }
-# Connect ( combines Legacy functions ManualInput, LoadFromSave & CreateNewSave )
+# Connect
 function Connect {
 back2="Connect"; store__current_status; cd $_home/ZTC_Save/SAVED_NETWORKS; ask4input="[ ~~~ type / paste network ID or alias ~~~ ]"
 if [[ "$initial_run" == "1" ]]; then ask4input="WELCOME TO ZTC, ENTER A NETWORK ID TO GET STARTED."; fi
 echo "/// CONNECT TO ZEROTIER NETWORK "
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
 gen_alias_index_txt; echo "$ask4input"; echo ""; read -r input_id
-if [[ ${#input_id} -eq 16 ]]; then _id2check="$input_id"; check4invalid__id # ( if user enters a network ID instead of an alias, connect to network id and check if savefile corresponding to id exists. )
-saved_id=$input_id # <-- syncs value in input_id to saved_id  <-- ( they should always hold the same value )
-savecheck=$(find -maxdepth 1 -name '*.txt' -exec grep -l $input_id {} +); sc="sc.txt" # ( if network id entered already belongs to an alias, assign it to $saved_alias. )
+_id () {
+check4invalid__id; savecheck=$(find -maxdepth 1 -name '*.txt' -exec grep -l $input_id {} +); sc="sc.txt" # ( check if entered network id is already saved and if so, load corresponding alias )
 if [[ $savecheck == *"./"* ]]; then echo "$savecheck" > $sc; sed -i "s#.txt##g" $sc; sed -i "s#./##g" $sc; saved_alias=$(<$sc); rm $sc; # <-- ( loads found alias into $saved_alias )
 else echo ""; echo "[ ~~~ enter alias for $input_id, to save this network ~~~ ]"; echo ""; read -r saved_alias; echo "" # <-- ( if the id should not be found in any savefile, prompt user to enter an alias & create new save entry. )
-echo "$saved_id" > $saved_alias.txt; echo "[ .:SAVE CREATED:. ]"; sleep 0.4; fi # <-- stores network id in .txt <-- ( writes save )
-clear; echo "[ CONNECTING TO NETWORK ID: $input_id / ALIAS: $saved_alias ]"; echo ""; echo "$t1"; $_doso $_ztc $_j $input_id; echo "$t1"; echo ""; initial_run=""
+echo "$input_id" > $saved_alias.txt; echo "[ .:SAVE CREATED:. ]"; initial_run=""; sleep 0.4; fi # <-- stores network id in .txt <-- ( writes save )
+}
+_alias () {
+saved_alias=$input_id; check4invalid__alias # if alias was entered, check if it exists.
+input_id=$(<$saved_alias.txt) # <-- loads content of $saved_alias.txt into $input_id. <-- ( loads save )
+check4invalid__id # <-- makes sure that the given network id is valid, else complains.
+}
+if [[ ${#input_id} -eq 16 ]]; then _id; else _alias; fi
+clear; echo "[ CONNECTING TO NETWORK ID: $input_id / ALIAS: $saved_alias ]"; echo ""; echo "$t1"; $_doso $_ztc $_j $input_id; echo "$t1"; echo "" # <-- connects 
 fetch_network_details; cd $_home/ZTC_Save/; store__lcn; store__current_status; echo "$_dmsg"; echo ""
-return2main_menu 
-else saved_alias=$input_id; check4invalid__alias # if, instead a network id, an alias was entered, check if it exists.
-saved_id=$(<$saved_alias.txt) # <-- loads content of .txt into saved_id. <-- ( loads save )
-_id2check="$saved_id"; check4invalid__id # <-- makes sure that the given network id is valid, else complains.
-input_id=$saved_id # <-- syncs value in saved_id to input_id
-clear; echo "[ CONNECTING TO NETWORK ID: $saved_id / ALIAS: $saved_alias ]"; echo ""; echo "$t1"; $_doso $_ztc $_j $saved_id; echo "$t1"; echo "" # <-- connects with network id stored in saved_id.
-fetch_network_details; cd $_home/ZTC_Save/; store__lcn; store__current_status; echo "$_dmsg"; echo ""
-return2main_menu; fi
+return2main_menu
 }
 # reconnect <-- refreshes connection to the currently selected network.
-function reconnect {
-_id2check="$input_id"; if_network_not_present__fail; recall__lcn; check4invalid__id; fetch_network_details; store__lcn; echo "$_dmsg"; echo ""; return2main_menu
-}
+function reconnect { if_network_not_present__fail; recall__lcn; check4invalid__id; fetch_network_details; store__lcn; echo "$_dmsg"; echo ""; return2main_menu ;}
 # disconnect
 function disconnect {
 if_network_not_present__fail; store__current_status
@@ -178,7 +173,7 @@ echo "// DISCONNECT FROM NETWORK"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
 echo "DISCONNECT FROM $input_id ?"; echo ""; echo "[ Y / N ]"; echo ""; read -r disconnect
 case $disconnect in
-	1|y|Y) echo ""; echo "$t1"; $_doso $_ztc $_l $input_id; echo "$t1"; init_status; store__lcn; store__current_status; return2main_menu;;
+	y|Y) echo ""; echo "$t1"; $_doso $_ztc $_l $input_id; echo "$t1"; init_status; store__lcn; store__current_status; return2main_menu;;
 	N|n) echo ""; echo "CANCELED."; echo ""; recall__current_status; return2main_menu;;
 	q|Q) return2main_menu;;
 	*) Logo; disconnect
@@ -281,7 +276,6 @@ case $main_menu in
 	*) main_menu
 esac
 }
-##########################################################
 # important vars
 _doso="sudo"
 _home="/home/$USER"
@@ -299,7 +293,6 @@ while [ $i -lt ${#bin[@]} ]; do
 if type -p "${bin[$i]}" > /dev/null; then pm="${bin[$i]}"; _add="$pm install"; break; fi
 ((i++))
 done
-_qrencode="qrencode"
 if [[ "$pm" == "apk" ]]; then _doso="doas"; _add="apk add"; _qrencode="libqrencode-tools"; fi
 if [[ "$pm" == "pacman" ]]; then _add="pacman -S"; fi
 (! type -p curl >/dev/null && $_doso $_add)
@@ -307,4 +300,4 @@ if [[ "$pm" == "pacman" ]]; then _add="pacman -S"; fi
 _cr='\033[0m'; red='\033[0;31m'; green='\033[0;32m'; blue='\033[0;34m' # <-- basic colors
 if [ "$EUID" -eq 0 ]; then _home="/root"; fi # <-- if user is root, changes $_home from "/home/$USER" to "/root" ( this also means that root has it's own savedir )
 # _launch
-function _launch { clear; pingtest; check4installed_zerotier_client; check4save; init_status; recall__lcn; main_menu; }; _launch  # <--  ( //LAUNCH\\ )
+function _launch { clear; check4installed_zerotier_client; check4save; init_status; recall__lcn; main_menu; }; _launch  # <--  ( //LAUNCH\\ )
