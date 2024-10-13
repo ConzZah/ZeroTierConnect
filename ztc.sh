@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
   #===============================================
-  # Project: zerotier-connect_v0.7.2 / patch #1 
+  # Project: zerotier-connect_v0.7.2 / patch #2 
   # Author:  ConzZah / ©️ 2024
-  # Last Modification: 13.10.24 / 05:00 [v0.7.2]
+  # Last Modification: 13.10.24 / 09:15 [v0.7.2]
   # https://github.com/ConzZah/ZeroTierConnect
   #===============================================
 # check4installed_zerotier_client <-- ( checks if zerotier is installed & calls pingtest )
@@ -105,20 +105,20 @@ allow_global_status=$($_doso $_ztc get $input_id allowGlobal); allow_managed_sta
 # if_network_not_present__fail <-- will get triggered if $input_id is set to "/" or none at all.
 function if_network_not_present__fail {
 error_msg="[ ~~~ [ERROR]: NO NETWORK SELECTED, TRY AGAIN. ~~~ ]"
-if [[ "$input_id" == "" || "$input_id" == "/" ]]; then echo "$error_msg"; echo ""; _r2main="manual"; return2main_menu; fi
+if [[ "$input_id" == "" || "$input_id" == "/" ]]; then echo "$error_msg"; echo ""; [ ! -z $_args ] && exit; _r2main="manual"; return2main_menu; fi
 }
 # check4invalid__id ( check if user input given is an actual network id )
 function check4invalid__id {
 error_msg="[ ERROR: INVALID NETWORK ID. PRESS ANY KEY TO TRY AGAIN. ]"
 _check_id=$($_doso $_ztc $_j $input_id) # <-- checks if $input_id is valid by trying to join it  
-if [[ "$input_id" == "q" || "$input_id" == "Q" ]]; then recall__current_status; return2main_menu; fi  # <-- quit to main_menu during text entry: if user enters "q / Q", recall last known network values & quit to main menu
+if [[ "$input_id" =~ ^(q|Q)$ ]]; then recall__current_status; return2main_menu; fi  # <-- quit to main_menu during text entry: if user enters "q / Q", recall last known network values & quit to main menu
 if [[ "$_check_id" == "404"* || "$_check_id" == "invalid network id" ]]; then echo "$error_msg"; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # NOTE: $back2 refers to the function that it was called from.
 } 
 # check4invalid__alias 
 function check4invalid__alias {
 _empty="[ ERROR: YOU ENTERED NOTHING. PRESS ANY KEY TO TRY AGAIN. ]"; doesnt_exist="[ ERROR: $saved_alias DOESN'T EXIST. PRESS ANY KEY TO TRY AGAIN. ]"
-if [[ "$initial_run" == "1" ]]; then if [[ "$saved_alias" == "q" || "$saved_alias" == "Q" ]]; then clear; InitialRun; fi; fi 
-if [[ "$saved_alias" == "q" || "$saved_alias" == "Q" ]]; then recall__current_status; return2main_menu; fi # <-- if user enters "q", quit to main menu
+if [ ! -z "$initial_run" ] && [[ "$saved_alias" =~ ^(q|Q)$ ]]; then clear; InitialRun; fi
+if [[ "$saved_alias" =~ ^(q|Q)$ ]]; then recall__current_status; return2main_menu; fi # <-- if user enters "q", quit to main menu
 if [[ "$saved_alias" == "" ]]; then echo "$_empty"; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # <-- if user enters nothing, shows error and lets them try again
 if [ ! -f $_home/ZTC_Save/SAVED_NETWORKS/$saved_alias.txt ]; then echo "$doesnt_exist"; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # <-- if input does not match any saved networks, shows error and lets them try again
 }
@@ -131,7 +131,7 @@ function check4save { if [ -z "$( ls "$_home/ZTC_Save/SAVED_NETWORKS/" )" ]; the
 # InitialRun <--- (only gets called if no savefile is detected)
 function InitialRun { cd /$_home; mkdir -p $_home/ZTC_Save/SAVED_NETWORKS; cd $_home/ZTC_Save/SAVED_NETWORKS; init_status; Logo; Connect; }
 # ztc_help <-- ZTC help / manual page
-function ztc_help { cd $_home/ZTC_Save/; wget -q https://github.com/ConzZah/ZeroTierConnect/raw/main/ztc_helppage.txt; less ztc_helppage.txt; return2main_menu; }
+function ztc_help { cd $_home/ZTC_Save/; wget -q https://github.com/ConzZah/ZeroTierConnect/raw/main/ztc_helppage.txt; less ztc_helppage.txt; rm ztc_helppage.txt; [ ! -z $_args ] && exit; return2main_menu; }
 # gen_alias_index_txt <-- generates alias_index.txt by displaying the contents of each savefile (the network id) alongside the filename (the alias).
 function gen_alias_index_txt {
 _index="alias_index.txt"; _desc="       ID          ALIAS"; _error="NO NETWORKS SAVED YET."
@@ -196,10 +196,10 @@ esac
 }
 # nwqr <-- creates qr code for currently selected network id ( uses local qrencode instead of qrenco.de as of v0.7.2 )
 function nwqr { 
-if_network_not_present__fail; clear; echo "QR CODE FOR NETWORK ID: $input_id"; echo "";
+if_network_not_present__fail; echo "QR CODE FOR NETWORK ID: $input_id"; echo "";
 _nwqr="https://joinzt.com/addnetwork?nwid=$input_id&v=1"
 qrencode -m 2 -t utf8 <<< "$_nwqr"; echo ""; nwqr=""
-_r2main="manual"; return2main_menu
+[ ! -z $_args ] && exit; _r2main="manual"; return2main_menu
 }
 # CheckClientInfo
 function CheckClientInfo {
@@ -208,7 +208,7 @@ echo "~~~~~~~~~~~~~~~~~"; echo ""
 IFS=" " read -r -a _info <<< "$($_doso $_ztc $_i)" # <-- creates array, (uses spaces as seperator), and writes output of "sudo/doas zerotier-cli info" to said array 
 echo "ZEROTIER VERSION: ${_info[3]}"; echo ""
 echo "CLIENT ID: ${_info[2]}"; echo ""
-echo "STATE: ${_info[4]}"; echo ""; _r2main="manual"; return2main_menu; }
+echo "STATE: ${_info[4]}"; echo ""; [ ! -z $_args ] && exit; _r2main="manual"; return2main_menu; }
 # CheckConnectedNetworks
 function CheckConnectedNetworks {
 echo "/// CONNECTED NETWORKS"
@@ -221,9 +221,9 @@ echo "~~~~~~~~~~~~~~~~~~~~~"
 $_doso $_ztc peers|sed 's#200 peers##g'; echo ""; _r2main="manual"; return2main_menu; }
 # get_net_info
 function get_net_info {
-Logo; if_network_not_present__fail
-echo "// GET NETWORK INFO FOR $input_id:"
-echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
+if_network_not_present__fail
+echo "// NETWORK INFO FOR $input_id:"
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
 fetch_network_details
 echo "Network Name: $actual_netname"; echo ""
 echo "Network ID: $input_id"; echo ""
@@ -233,7 +233,7 @@ echo "Allow DNS: $allow_dns_status"; echo ""
 echo "Allow Default: $allow_default_status"; echo ""
 echo "Allow Global: $allow_global_status"; echo ""
 echo "Allow Managed: $allow_managed_status"; echo ""
-_r2main="manual"; return2main_menu
+[ ! -z $_args ] && exit; _r2main="manual"; return2main_menu
 }
 # return2main_menu
 function return2main_menu {
@@ -286,8 +286,9 @@ _l="leave"
 _lnw="listnetworks"
 _dmsg="[ ~~~ DONE ~~~ ]"
 t1="~~~~~~~~~~~~~~~~~~"
-# determine package manager & check for missing dependencies (curl & qrencode)
-clear; echo "CHECKNG FOR MISSING DEPENDENCIES.."; echo ""; _qrencode="qrencode"
+# check_deps <-- determine package manager & check for missing dependencies (curl & qrencode)
+function check_deps {
+clear; echo "INSTALLING MISSING DEPENDENCIES.."; echo ""; _qrencode="qrencode"
 i=0; bin=("apt" "apk" "dnf" "yum" "pacman" "zypper" "brew"); pm="" 
 while [ $i -lt ${#bin[@]} ]; do
 if type -p "${bin[$i]}" > /dev/null; then pm="${bin[$i]}"; _add="$pm install"; break; fi
@@ -295,9 +296,22 @@ if type -p "${bin[$i]}" > /dev/null; then pm="${bin[$i]}"; _add="$pm install"; b
 done
 if [[ "$pm" == "apk" ]]; then _doso="doas"; _add="apk add"; _qrencode="libqrencode-tools"; fi
 if [[ "$pm" == "pacman" ]]; then _add="pacman -S"; fi
-(! type -p curl >/dev/null && $_doso $_add)
+(! type -p curl >/dev/null && $_doso $_add curl)
 (! type -p qrencode  >/dev/null && $_doso $_add $_qrencode)
+}
 _cr='\033[0m'; red='\033[0;31m'; green='\033[0;32m'; blue='\033[0;34m' # <-- basic colors
 if [ "$EUID" -eq 0 ]; then _home="/root"; fi # <-- if user is root, changes $_home from "/home/$USER" to "/root" ( this also means that root has it's own savedir )
+##########  ARGS  ##########
+# (work in progress)
+if [[ "$1" =~ ^(c|C|j|J|join)$ ]]; then $_doso $_ztc $_j "$2"; exit; fi # <-- join
+if [[ "$1" =~ ^(dc|DC|l|L|leave)$ ]]; then $_doso $_ztc $_l "$2"; exit; fi # <-- leave
+if [[ "$1" =~ ^(ci|CI|info)$ ]]; then _args="1"; CheckClientInfo; exit; fi # <-- info
+if [[ "$1" =~ ^(ln|LN|listnetworks)$ ]]; then $_doso $_ztc $_lnw; exit; fi # <-- listnetworks
+if [[ "$1" =~ ^(lp|LP|listpeers)$ ]]; then $_doso $_ztc listpeers; exit; fi # <-- listpeers
+if [[ "$1" =~ ^(g|G|get)$ ]]; then $_doso $_ztc get "$2" "$3"; exit; fi # <-- get
+if [[ "$1" =~ ^(s|S|set)$ ]]; then $_doso $_ztc set "$2" "$3"; exit; fi # <-- set
+if [[ "$1" =~ ^(qr|QR)$ ]]; then _args="1"; input_id=$2; nwqr; exit; fi # <-- qr code generation 
+if [[ "$1" =~ ^(i|I)$ ]]; then _args="1" input_id=$2; get_net_info; exit; fi # <-- network info
+if [[ "$1" =~ ^(h|H|help)$ ]]; then _args="1"; ztc_help; exit; fi # <-- help page
 # _launch
-function _launch { clear; check4installed_zerotier_client; check4save; init_status; recall__lcn; main_menu; }; _launch  # <--  ( //LAUNCH\\ )
+function _launch { clear; check_deps; check4installed_zerotier_client; check4save; init_status; recall__lcn; main_menu; }; _launch  # <--  ( //LAUNCH\\ )
