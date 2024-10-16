@@ -1,15 +1,36 @@
 #!/usr/bin/env bash
   #===============================================
-  # Project: zerotier-connect_v0.7.2 / patch #2 
+  # Project: zerotier-connect_v0.7.2 / patch #3 
   # Author:  ConzZah / ©️ 2024
-  # Last Modification: 13.10.24 / 10:21 [v0.7.2]
+  # Last Modification: 16.10.24 / 19:24
   # https://github.com/ConzZah/ZeroTierConnect
   #===============================================
+# important vars:
+_doso="sudo"
+_home="/home/$USER"
+_ztc="zerotier-cli"
+_j="join"; _l="leave"
+_lnw="listnetworks"
+_qrencode="qrencode"
+_dmsg="[ ~~~ DONE ~~~ ]"
+_SAVED="$_home/ZTC_Save/SAVED_NETWORKS"
+_ztcheck=$($_doso $_ztc -v); mkdir -p "$_SAVED"; cd "$_SAVED"; t1="~~~~~~~~~~~~~~~~~~"
+_cr='\033[0m'; red='\033[0;31m'; green='\033[0;32m'; blue='\033[0;34m' # <-- basic colors
+if [ "$EUID" -eq 0 ]; then _home="/root"; fi # <-- if user is root, changes $_home from "/home/$USER" to "/root" ( this also means that root has it's own savedir )
+# determine package manager & set options where needed:
+i=0; bin=("apt" "apk" "dnf" "yum" "pacman" "zypper" "brew"); pm=""; while [ $i -lt ${#bin[@]} ]; do
+if type -p "${bin[$i]}" > /dev/null; then pm="${bin[$i]}"; _add="$pm install"; break; fi
+((i++)); done
+if [[ "$pm" == "apk" ]]; then ! type -p sudo > /dev/null && _doso="doas"; _add="apk add"; _qrencode="libqrencode-tools"; fi
+if [[ "$pm" == "pacman" ]]; then _add="pacman -S"; fi
+# check_deps <-- installs missing dependencies
+function check_deps {
+echo -e "INSTALLING MISSING DEPENDENCIES..\n"
+i=0; deps=("$_qrencode" "curl" "sed"); while [ $i -lt ${#deps[@]} ]; do
+if ! type -p "${deps[$i]}" > /dev/null; then $_doso $_add ${deps[$i]}; fi
+((i++)); done; clear ;}
 # check4installed_zerotier_client <-- ( checks if zerotier is installed & calls pingtest )
-function check4installed_zerotier_client {
-error_msg="[ [ERROR]: ZEROTIER COULD NOT BE FOUND. ]"; zt_install_check=$($_doso $_ztc $_i); clear; pingtest
-if [[ "$zt_install_check" == "" ]]; then echo "$error_msg"; if [ ! -f /usr/sbin/zerotier-one ]; then echo ""; ask2install_zerotier_client; fi; fi
-}
+function check4installed_zerotier_client { clear; pingtest; if [[ "$_ztcheck" == "" ]]; then echo "[ [ERROR]: ZEROTIER COULD NOT BE FOUND. ]"; if [ ! -f /usr/sbin/zerotier-one ]; then ask2install_zerotier_client; fi; fi ;}
 # ask2install_zerotier_client <--  ( asks user if they want to install the zerotier client if it hasnt been detected. )
 function ask2install_zerotier_client {
 echo "Y) INSTALL ZEROTIER"; echo "Q) EXIT"; echo ""; read -r ask2installZT
@@ -105,7 +126,7 @@ allow_global_status=$($_doso $_ztc get $input_id allowGlobal); allow_managed_sta
 # if_network_not_present__fail <-- will get triggered if $input_id is set to "/" or none at all.
 function if_network_not_present__fail {
 error_msg="[ ~~~ [ERROR]: NO NETWORK SELECTED, TRY AGAIN. ~~~ ]"
-if [[ "$input_id" == "" || "$input_id" == "/" ]]; then echo "$error_msg"; echo ""; [ ! -z $_args ] && exit; _r2main="manual"; return2main_menu; fi
+if [[ "$input_id" == "" || "$input_id" == "/" ]]; then echo "$error_msg"; _r2main="manual"; return2main_menu; fi
 }
 # check4invalid__id ( check if user input given is an actual network id )
 function check4invalid__id {
@@ -116,26 +137,22 @@ if [[ "$_check_id" == "404"* || "$_check_id" == "invalid network id" ]]; then ec
 } 
 # check4invalid__alias 
 function check4invalid__alias {
-_empty="[ ERROR: YOU ENTERED NOTHING. PRESS ANY KEY TO TRY AGAIN. ]"; doesnt_exist="[ ERROR: $saved_alias DOESN'T EXIST. PRESS ANY KEY TO TRY AGAIN. ]"
+_empty="[ YOU ENTERED NOTHING. ]"; doesnt_exist="[ ERROR: $saved_alias DOESN'T EXIST. ]"
 if [ ! -z "$initial_run" ] && [[ "$saved_alias" =~ ^(q|Q)$ ]]; then clear; InitialRun; fi
 if [[ "$saved_alias" =~ ^(q|Q)$ ]]; then recall__current_status; return2main_menu; fi # <-- if user enters "q", quit to main menu
-if [[ "$saved_alias" == "" ]]; then echo "$_empty"; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # <-- if user enters nothing, shows error and lets them try again
-if [ ! -f $_home/ZTC_Save/SAVED_NETWORKS/$saved_alias.txt ]; then echo "$doesnt_exist"; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # <-- if input does not match any saved networks, shows error and lets them try again
+if [[ "$saved_alias" == "" ]]; then echo "$_empty"; __BP; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # <-- if user enters nothing, shows error and lets them try again
+if [ ! -f "$_SAVED/$saved_alias.txt" ]; then echo "$doesnt_exist"; __BP; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # <-- if input does not match any saved networks, shows error and lets them try again
 }
 # pingtest <-- checks if your machine is connected to the internet by pinging zerotier.com before starting ztc
 function pingtest {
 echo "CHECKING NETWORK CONNECTION.."; echo ""; if ping -q -i 0.5 -c 2 -w 7 zerotier.com > /dev/null 2>&1; then echo "ONLINE"; clear; else 
 clear; echo "YOU'RE OFFLINE. CHECK YOUR CONNECTION & TRY AGAIN."; echo ""; echo "EXITING IN 3 SECONDS.."; echo ""; sleep 3; exit; fi; }
-# check4save <-- checks if savedata exists by checking if savedir is empty.
-function check4save { if [ -z "$( ls "$_home/ZTC_Save/SAVED_NETWORKS/" )" ]; then initial_run="1"; InitialRun; fi; }
-# InitialRun <--- (only gets called if no savefile is detected)
-function InitialRun { cd /$_home; mkdir -p $_home/ZTC_Save/SAVED_NETWORKS; cd $_home/ZTC_Save/SAVED_NETWORKS; init_status; Logo; Connect; }
 # ztc_help <-- ZTC help / manual page
-function ztc_help { cd $_home/ZTC_Save/; wget -q https://github.com/ConzZah/ZeroTierConnect/raw/main/ztc_helppage.txt; less ztc_helppage.txt; rm ztc_helppage.txt; [ ! -z $_args ] && exit; return2main_menu; }
+function ztc_help { cd $_home/ZTC_Save/; curl -s -L -O https://github.com/ConzZah/ZeroTierConnect/raw/main/ztc_helppage.txt; less ztc_helppage.txt; rm ztc_helppage.txt; return2main_menu; }
 # gen_alias_index_txt <-- generates alias_index.txt by displaying the contents of each savefile (the network id) alongside the filename (the alias).
 function gen_alias_index_txt {
 _index="alias_index.txt"; _desc="       ID          ALIAS"; _error="NO NETWORKS SAVED YET."
-if [ -z "$( ls "$_home/ZTC_Save/SAVED_NETWORKS/" )" ]; then _desc="$_error"; fi; echo "$_desc"; echo "" # <-- if savefolder is empty, assign $_error to _desc
+if [ -z "$( ls "$_SAVED" )" ]; then _desc="$_error"; fi; echo "$_desc"; echo "" # <-- if savefolder is empty, assign $_error to _desc
 for network_alias in *.txt; do
 if [[ "$_desc" == "$_error" ]]; then break; fi
 network_id=$(cat "$network_alias"); echo "$network_id   $network_alias"|cut -d'.' -f1 >> raw_$_index
@@ -143,11 +160,12 @@ done; if [ -f raw_$_index ]; then sed '/^$/d' raw_$_index > $_index; cat $_index
 }
 # Connect
 function Connect {
-back2="Connect"; store__current_status; cd $_home/ZTC_Save/SAVED_NETWORKS; ask4input="[ ~~~ type / paste network ID or alias ~~~ ]"
+back2="Connect"; store__current_status; cd "$_SAVED"; ask4input="[  INPUT NETWORK ID OR ALIAS  ]"
 if [[ "$initial_run" == "1" ]]; then ask4input="WELCOME TO ZTC, ENTER A NETWORK ID TO GET STARTED."; fi
 echo "/// CONNECT TO ZEROTIER NETWORK "
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
-gen_alias_index_txt; echo "$ask4input"; echo ""; read -r input_id
+[ -z $quickload ] && gen_alias_index_txt && echo -e "$ask4input\n" && read -r input_id || input_id=$quickload
+# ^ if $quickload is empty continue as normal. if not, skip the above and copy value of $quickload to $input_id
 _id () {
 check4invalid__id; savecheck=$(find -maxdepth 1 -name '*.txt' -exec grep -l $input_id {} +); sc="sc.txt" # ( check if entered network id is already saved and if so, load corresponding alias )
 if [[ $savecheck == *"./"* ]]; then echo "$savecheck" > $sc; sed -i "s#.txt##g" $sc; sed -i "s#./##g" $sc; saved_alias=$(<$sc); rm $sc; # <-- ( loads found alias into $saved_alias )
@@ -159,9 +177,9 @@ saved_alias=$input_id; check4invalid__alias # if alias was entered, check if it 
 input_id=$(<$saved_alias.txt) # <-- loads content of $saved_alias.txt into $input_id. <-- ( loads save )
 check4invalid__id # <-- makes sure that the given network id is valid, else complains.
 }
-if [[ ${#input_id} -eq 16 ]]; then _id; else _alias; fi
-clear; echo "[ CONNECTING TO NETWORK ID: $input_id / ALIAS: $saved_alias ]"; echo ""; echo "$t1"; $_doso $_ztc $_j $input_id; echo "$t1"; echo "" # <-- connects 
-fetch_network_details; cd $_home/ZTC_Save/; store__lcn; store__current_status; echo "$_dmsg"; echo ""
+if [[ ${#input_id} -eq 16 ]]; then _id; else _alias; fi # <-- decide how to handle input
+echo -e "\n[ CONNECTING TO NETWORK ID: $input_id / ALIAS: $saved_alias ]\n"; echo "$t1"; $_doso $_ztc $_j $input_id; echo "$t1" # <-- connects 
+__BP; fetch_network_details; cd $_home/ZTC_Save/; store__lcn; store__current_status
 return2main_menu
 }
 # reconnect <-- refreshes connection to the currently selected network.
@@ -182,7 +200,7 @@ init_status; store__lcn; return2main_menu
 }
 # DeleteSave
 function DeleteSave {
-back2="DeleteSave"; store__current_status; cd $_home/ZTC_Save/SAVED_NETWORKS
+back2="DeleteSave"; store__current_status; cd "$_SAVED"
 echo "/// DELETE SAVE ENTRY"
 echo "~~~~~~~~~~~~~~~~~~~~~~"; echo ""
 gen_alias_index_txt; echo ""; echo "[ ~~~ type network alias & press [ENTER] ~~~ ]"; echo ""; read -r saved_alias; echo ""
@@ -191,6 +209,7 @@ case $DeleteSave in
 	Y|y) _dl=$(<$saved_alias.txt); $_doso $_ztc $_l $_dl >/dev/null 2>&1; rm "$saved_alias.txt"; echo ""; echo "$saved_alias has been deleted."; recall__current_status; echo ""
 	if [[ "$_dl" == "$input_id" ]]; then init_status; store__lcn; store__current_status; _dl=""; fi; _r2main="manual"; return2main_menu ;;
 	N|n) echo ""; echo "CANCELED."; echo ""; recall__current_status; return2main_menu;;
+	q|Q) return2main_menu;;
 	*) Logo; DeleteSave
 esac 
 }
@@ -199,16 +218,16 @@ function nwqr {
 if_network_not_present__fail; echo "QR CODE FOR NETWORK ID: $input_id"; echo "";
 _nwqr="https://joinzt.com/addnetwork?nwid=$input_id&v=1"
 qrencode -m 2 -t utf8 <<< "$_nwqr"; echo ""; nwqr=""
-[ ! -z $_args ] && exit; _r2main="manual"; return2main_menu
+_r2main="manual"; return2main_menu
 }
 # CheckClientInfo
 function CheckClientInfo {
 echo "/// CLIENT INFO"
 echo "~~~~~~~~~~~~~~~~~"; echo ""
-IFS=" " read -r -a _info <<< "$($_doso $_ztc $_i)" # <-- creates array, (uses spaces as seperator), and writes output of "sudo/doas zerotier-cli info" to said array 
+IFS=" " read -r -a _info <<< "$($_doso $_ztc info)" # <-- creates array, (uses spaces as seperator), and writes output of "sudo/doas zerotier-cli info" to said array 
 echo "ZEROTIER VERSION: ${_info[3]}"; echo ""
 echo "CLIENT ID: ${_info[2]}"; echo ""
-echo "STATE: ${_info[4]}"; echo ""; [ ! -z $_args ] && exit; _r2main="manual"; return2main_menu; }
+echo "STATE: ${_info[4]}"; echo ""; _r2main="manual"; return2main_menu; }
 # CheckConnectedNetworks
 function CheckConnectedNetworks {
 echo "/// CONNECTED NETWORKS"
@@ -233,13 +252,13 @@ echo "Allow DNS: $allow_dns_status"; echo ""
 echo "Allow Default: $allow_default_status"; echo ""
 echo "Allow Global: $allow_global_status"; echo ""
 echo "Allow Managed: $allow_managed_status"; echo ""
-[ ! -z $_args ] && exit; _r2main="manual"; return2main_menu
+_r2main="manual"; return2main_menu
 }
 # return2main_menu
 function return2main_menu {
 # defaults to auto (0.7s wait time & instant transition to main_menu)
 # ^ unless _r2main="manual" is specified BEFORE return2main_menu (see get_net_info for example)
-_msg_auto="[ ~~~ RETURNING TO MAIN MENU.. ~~~ ]"; _msg_manual="[ ~~~ PRESS ANY KEY TO RETURN TO MAIN MENU ~~~ ]"
+__BP; _msg_auto="[ ~~~ RETURNING TO MAIN MENU.. ~~~ ]"; _msg_manual="[ ~~~ PRESS ANY KEY TO RETURN TO MAIN MENU ~~~ ]"
 if [[ "$_r2main" == "" ]]; then _r2main="sleep 0.7"; _msg="$_msg_auto"; fi # <-- auto 
 if [[ "$_r2main" == "manual" ]]; then _r2main="read -r -n 1 -s"; _msg="$_msg_manual"; fi # <-- manual
 echo "$_msg"; $_r2main
@@ -254,10 +273,10 @@ echo "~~~~~~~~~~~~~~"
 echo "C)  CONNECT TO NETWORK"
 echo "DC) DISCONNECT FROM NETWORK"
 echo "R)  REFRESH NETWORK CONNECTION"
-echo "I)  GET INFO ABOUT CURRENT NETWORK"
 echo "LP) DISPLAY CONNECTED PEERS"
 echo "LN) DISPLAY CONNECTED NETWORKS"
-echo "CI) GET INFO ABOUT ZT CLIENT"
+echo "I)  CURRENT NETWORK INFO"
+echo "i)  ZT CLIENT INFO"
 echo "H)  HELP"
 echo "Q)  QUIT"
 echo ""; read -r main_menu
@@ -265,10 +284,10 @@ case $main_menu in
 	c|C) Logo; Connect;;
 	dc|DC) Logo; disconnect;;
 	r|R) Logo; reconnect;;
-	i|I|netstat) Logo; get_net_info;;
 	lp|LP) Logo; CheckConnectedPeers;;
 	ln|LN|listnetworks) Logo; CheckConnectedNetworks;;
-	ci|CI|info) Logo; CheckClientInfo;;
+	I|netstat) Logo; get_net_info;;
+	i|info) Logo; CheckClientInfo;;
 	dl|DL|delete) Logo; DeleteSave;;
 	qr|QR) Logo; nwqr;;
 	h|H|help) Logo; ztc_help;;
@@ -276,44 +295,24 @@ case $main_menu in
 	*) main_menu
 esac
 }
-# important vars
-_doso="sudo"
-_home="/home/$USER"
-_ztc="zerotier-cli"
-_i="info"
-_j="join"
-_l="leave"
-_lnw="listnetworks"
-_qrencode="qrencode"
-_dmsg="[ ~~~ DONE ~~~ ]"
-t1="~~~~~~~~~~~~~~~~~~"
-# determine package manager & set options where needed:
-i=0; bin=("apt" "apk" "dnf" "yum" "pacman" "zypper" "brew"); pm="" 
-while [ $i -lt ${#bin[@]} ]; do
-if type -p "${bin[$i]}" > /dev/null; then pm="${bin[$i]}"; _add="$pm install"; break; fi
-((i++))
-done
-if [[ "$pm" == "apk" ]]; then _doso="doas"; _add="apk add"; _qrencode="libqrencode-tools"; fi
-if [[ "$pm" == "pacman" ]]; then _add="pacman -S"; fi
-# check_deps <-- check for missing dependencies (curl & qrencode)
-function check_deps {
-echo "INSTALLING MISSING DEPENDENCIES.."; echo ""
-(! type -p curl >/dev/null && $_doso $_add curl)
-(! type -p qrencode  >/dev/null && $_doso $_add $_qrencode)
-clear ;}
-_cr='\033[0m'; red='\033[0;31m'; green='\033[0;32m'; blue='\033[0;34m' # <-- basic colors
-if [ "$EUID" -eq 0 ]; then _home="/root"; fi # <-- if user is root, changes $_home from "/home/$USER" to "/root" ( this also means that root has it's own savedir )
 ##########  ARGS  ##########
-# (work in progress)
-if [[ "$1" =~ ^(c|C|j|J|join)$ ]]; then $_doso $_ztc $_j "$2"; exit; fi # <-- join
-if [[ "$1" =~ ^(dc|DC|l|L|leave)$ ]]; then $_doso $_ztc $_l "$2"; exit; fi # <-- leave
-if [[ "$1" =~ ^(ci|CI|info)$ ]]; then _args="1"; CheckClientInfo; exit; fi # <-- info
+__BP () { [ ! -z $_args ] && exit ;}
+[ -z "$1" ] && _launch # <-- if there are no arguments, hit _launch
+_args="x" # <-- if $_args has any value, we know where we're at
+if [[ "$1" == "-j" ]]; then _ztc="$_ztc -j"; shift; fi # <-- '-j' switch (enables JSON Output, usage: ztc -j [option] [network id/alias] )
+if [[ "$1" =~ ^(c|C|j|J|join)$ ]]; then [ ${#2} -ne 16 ] && quickload=$2 && Connect || echo "$t1"; $_doso $_ztc $_j "$2"; echo "$t1"; exit; fi; # <-- join
+if [[ "$1" =~ ^(dc|DC|l|L|leave)$ ]]; then echo "$t1"; $_doso $_ztc $_l "$2"; echo "$t1"; exit; fi # <-- leave
+if [[ "$1" =~ ^(i|info)$ ]]; then CheckClientInfo; exit; fi # <-- client info
 if [[ "$1" =~ ^(ln|LN|listnetworks)$ ]]; then $_doso $_ztc $_lnw; exit; fi # <-- listnetworks
 if [[ "$1" =~ ^(lp|LP|listpeers)$ ]]; then $_doso $_ztc listpeers; exit; fi # <-- listpeers
 if [[ "$1" =~ ^(g|G|get)$ ]]; then $_doso $_ztc get "$2" "$3"; exit; fi # <-- get
 if [[ "$1" =~ ^(s|S|set)$ ]]; then $_doso $_ztc set "$2" "$3"; exit; fi # <-- set
-if [[ "$1" =~ ^(qr|QR)$ ]]; then _args="1"; input_id=$2; nwqr; exit; fi # <-- qr code generation 
-if [[ "$1" =~ ^(i|I)$ ]]; then _args="1" input_id=$2; get_net_info; exit; fi # <-- network info
-if [[ "$1" =~ ^(h|H|help)$ ]]; then _args="1"; ztc_help; exit; fi # <-- help page
+if [[ "$1" =~ ^(lm|LM|listmoons)$ ]]; then $_doso $_ztc listmoons; exit; fi # <-- listmoons
+if [[ "$1" =~ ^(orb|orbit)$ ]]; then $_doso $_ztc orbit "$2" "$3"; exit; fi # <-- orbit
+if [[ "$1" =~ ^(dorb|deorbit)$ ]]; then $_doso $_ztc deorbit "$2"; exit; fi # <-- deorbit
+if [[ "$1" =~ ^(I|netstat)$ ]]; then input_id=$2; get_net_info; exit; fi # <-- network info
+if [[ "$1" =~ ^(qr|QR)$ ]]; then input_id=$2; nwqr; exit; fi # <-- qr code generation
+if [[ "$1" =~ ^(h|H|help)$ ]]; then ztc_help; exit; fi # <-- help page
+[ ! -z "$1" ] && echo "[ ERROR: UNKNOWN OPTION. ] " && exit # <-- if nothing matched print error & exit
 # _launch
-function _launch { clear; check_deps; check4installed_zerotier_client; check4save; init_status; recall__lcn; main_menu; }; _launch  # <--  ( //LAUNCH\\ )
+function _launch { clear; _args=""; check_deps; check4installed_zerotier_client; init_status; recall__lcn; main_menu; }; _launch  # <--  ( //LAUNCH\\ )
