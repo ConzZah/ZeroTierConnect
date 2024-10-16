@@ -1,11 +1,14 @@
 <h1 align="center"> ZeroTierConnect </h1>
 
-<p align="center"> A simple TUI ( and installer ) for ZeroTier on Linux.</p>
+<p align="center"> ZTC is a wrapper for zerotier-cli, with some added features: </p>
 
+<p align="center"> - a save-system (alias creation for network ids) with the goal of connecting faster by entering an alias instead of the id )</p>
+<p align="center"> - on-device qr code generation for network ids (using qrencode)</p>
+<p align="center"> - shorter commands</p>
 
 <h2 align="center"> Requirements: </h2>
 
-- **Bash**
+<h3 align="center">- Bash</h3>
 
 <h2 align="center"> Get ZTC: </h2>
 
@@ -15,10 +18,10 @@
   </a>
 </p>
 
+<h2> DISCLAIMER: </h2>
 
-<h2 align="center"> DISCLAIMER: </h2>
+**I am not associated with ZeroTier, Inc.**
 
-**I am not, in any way, associated with ZeroTier, Inc.**
 
 Cheers, 
 
