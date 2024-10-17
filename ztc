@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
   #===============================================
-  # Project: zerotier-connect_v0.7.2 / patch #3 
+  # Project: zerotier-connect_v0.7.2 / patch #4 
   # Author:  ConzZah / ©️ 2024
-  # Last Modification: 16.10.24 / 19:24
+  # Last Modification: 17.10.24 / 16:54
   # https://github.com/ConzZah/ZeroTierConnect
   #===============================================
 # important vars:
@@ -14,30 +14,30 @@ _lnw="listnetworks"
 _qrencode="qrencode"
 _dmsg="[ ~~~ DONE ~~~ ]"
 _SAVED="$_home/ZTC_Save/SAVED_NETWORKS"
-_ztcheck=$($_doso $_ztc -v); mkdir -p "$_SAVED"; cd "$_SAVED"; t1="~~~~~~~~~~~~~~~~~~"
+mkdir -p "$_SAVED"; cd "$_SAVED"; t1="~~~~~~~~~~~~~~~~~~"
 _cr='\033[0m'; red='\033[0;31m'; green='\033[0;32m'; blue='\033[0;34m' # <-- basic colors
 if [ "$EUID" -eq 0 ]; then _home="/root"; fi # <-- if user is root, changes $_home from "/home/$USER" to "/root" ( this also means that root has it's own savedir )
-# determine package manager & set options where needed:
+# determine package manager, set options where needed and run _ztcheck
 i=0; bin=("apt" "apk" "dnf" "yum" "pacman" "zypper" "brew"); pm=""; while [ $i -lt ${#bin[@]} ]; do
-if type -p "${bin[$i]}" > /dev/null; then pm="${bin[$i]}"; _add="$pm install"; break; fi
-((i++)); done
+if type -p "${bin[$i]}" > /dev/null; then pm="${bin[$i]}"; _add="$pm install"; break; fi; ((i++)); done
 if [[ "$pm" == "apk" ]]; then ! type -p sudo > /dev/null && _doso="doas"; _add="apk add"; _qrencode="libqrencode-tools"; fi
 if [[ "$pm" == "pacman" ]]; then _add="pacman -S"; fi
-# check_deps <-- installs missing dependencies
-function check_deps {
-echo -e "INSTALLING MISSING DEPENDENCIES..\n"
-i=0; deps=("$_qrencode" "curl" "sed"); while [ $i -lt ${#deps[@]} ]; do
-if ! type -p "${deps[$i]}" > /dev/null; then $_doso $_add ${deps[$i]}; fi
-((i++)); done; clear ;}
-# check4installed_zerotier_client <-- ( checks if zerotier is installed & calls pingtest )
-function check4installed_zerotier_client { clear; pingtest; if [[ "$_ztcheck" == "" ]]; then echo "[ [ERROR]: ZEROTIER COULD NOT BE FOUND. ]"; if [ ! -f /usr/sbin/zerotier-one ]; then ask2install_zerotier_client; fi; fi ;}
+# check4installed_client <-- ( checks if zerotier is installed )
+function check4installed_client { ! $_doso $_ztc -v >/dev/null 2>&1 && [ ! -f /usr/sbin/zerotier-one ] && ask2install_zerotier_client || : ;}
+# check_deps <-- installs dependencies if they're missing.
+function check_deps { echo "CHECKING FOR MISSING DEPENDENCIES.."
+! type -p qrencode > /dev/null && $_doso $_add $_qrencode
+! type -p curl > /dev/null && $_doso $_add curl
+! type -p sed > /dev/null && $_doso $_add sed
+clear ;}
 # ask2install_zerotier_client <--  ( asks user if they want to install the zerotier client if it hasnt been detected. )
 function ask2install_zerotier_client {
+echo -e "[ [ERROR]: ZEROTIER CLIENT COULD NOT BE FOUND. ]\n"
 echo "Y) INSTALL ZEROTIER"; echo "Q) EXIT"; echo ""; read -r ask2installZT
 case $ask2installZT in
 	Y|y) zt_installer;;
 	q|Q) echo ""; echo "// EXIT"; exit;;
-	*) clear; check4installed_zerotier_client
+	*) clear; ask2install_zerotier_client
 esac
 }
 # zt_installer <-- ( downloads & installs zerotier client binarys through https://www.zerotier.com/download/. Also, if you're on Alpine Linux, it will ask you to build from source. )
@@ -45,7 +45,7 @@ function zt_installer {
 if [[ "$pm" == "apk" ]]; then clear; echo "ALPINE DETECTED"; echo ""; ask2compile4alpine; fi
 _dlmsg="[ ::: DOWNLOADING & INSTALLING ZEROTIER, PLEASE WAIT.. ::: ]"; ZT_done_msg="[ ZEROTIER INSTALL FINISHED. PRESS ANY KEY TO LAUNCH ZTC ]"
 echo ""; echo "$_dlmsg"; echo ""; ZTinstall=$(curl -s https://install.zerotier.com | $_doso bash) # default install through official script
-echo ""; echo "$ZT_done_msg"; echo ""; read -r -n 1 -s; _launch
+echo ""; echo "$ZT_done_msg"; echo ""; read -r -n 1 -s; start_ztc
 }
 function ask2compile4alpine {
 echo "Do you want to start building the ZeroTier Client from Source?"; echo ""; echo "( BE AWARE: This could take some time."; echo ""
@@ -66,7 +66,7 @@ cd /$_home; doas rm -rf ZeroTier_AutoCompile-Alpine # removes working dir to sav
 cd /etc/init.d; doas wget -q -O zerotier-one https://raw.githubusercontent.com/ConzZah/ZeroTier_AutoCompile-Alpine/main/zerotier-one.initd; doas chmod 755 zerotier-one; cd $wd # installs init script
 echo "tun" > zerotier-one.conf; doas mv -f zerotier-one.conf /usr/lib/modules-load.d/; doas modprobe tun; lsmod | grep tun
 doas rc-update add zerotier-one; doas rc-service zerotier-one start # adds zerotier-one service and starts it. 
-doas zerotier-one -d >/dev/null 2>&1; sleep 3; echo ""; echo ""; echo "[ PRESS ANY KEY TO START ZTC ]"; echo ""; read -r -n 1 -s; _launch
+doas zerotier-one -d >/dev/null 2>&1; sleep 3; echo ""; echo ""; echo "[ PRESS ANY KEY TO START ZTC ]"; echo ""; read -r -n 1 -s; start_ztc
 }
 # Logo
 function Logo { clear
@@ -130,10 +130,10 @@ if [[ "$input_id" == "" || "$input_id" == "/" ]]; then echo "$error_msg"; _r2mai
 }
 # check4invalid__id ( check if user input given is an actual network id )
 function check4invalid__id {
-error_msg="[ ERROR: INVALID NETWORK ID. PRESS ANY KEY TO TRY AGAIN. ]"
+error_msg="[ ERROR: INVALID NETWORK ID. ]"
 _check_id=$($_doso $_ztc $_j $input_id) # <-- checks if $input_id is valid by trying to join it  
 if [[ "$input_id" =~ ^(q|Q)$ ]]; then recall__current_status; return2main_menu; fi  # <-- quit to main_menu during text entry: if user enters "q / Q", recall last known network values & quit to main menu
-if [[ "$_check_id" == "404"* || "$_check_id" == "invalid network id" ]]; then echo "$error_msg"; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # NOTE: $back2 refers to the function that it was called from.
+if [[ "$_check_id" == "404"* || "$_check_id" == "invalid network id" ]]; then echo "$error_msg"; __BP; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # NOTE: $back2 refers to the function that it was called from.
 } 
 # check4invalid__alias 
 function check4invalid__alias {
@@ -295,11 +295,12 @@ case $main_menu in
 	*) main_menu
 esac
 }
-##########  ARGS  ##########
-__BP () { [ ! -z $_args ] && exit ;}
-[ -z "$1" ] && _launch # <-- if there are no arguments, hit _launch
-_args="x" # <-- if $_args has any value, we know where we're at
+__BP () { [ ! -z $args_present ] && exit ;} # <-- (lets us exit a function early if $args_present has any value)
+start_ztc () { clear; args_present=""; check_deps; check4installed_client; init_status; recall__lcn; main_menu; } # <--  start ztc in tui mode 
+[ -z "$1" ] && start_ztc && exit # <-- if there are no arguments, start_ztc
+[ ! -z "$1" ] && check4installed_client && args_present="x"  # <-- if there are, check4installed_client, set $args_present & continue
 if [[ "$1" == "-j" ]]; then _ztc="$_ztc -j"; shift; fi # <-- '-j' switch (enables JSON Output, usage: ztc -j [option] [network id/alias] )
+#### ARGUMENTS:
 if [[ "$1" =~ ^(c|C|j|J|join)$ ]]; then [ ${#2} -ne 16 ] && quickload=$2 && Connect || echo "$t1"; $_doso $_ztc $_j "$2"; echo "$t1"; exit; fi; # <-- join
 if [[ "$1" =~ ^(dc|DC|l|L|leave)$ ]]; then echo "$t1"; $_doso $_ztc $_l "$2"; echo "$t1"; exit; fi # <-- leave
 if [[ "$1" =~ ^(i|info)$ ]]; then CheckClientInfo; exit; fi # <-- client info
@@ -311,8 +312,6 @@ if [[ "$1" =~ ^(lm|LM|listmoons)$ ]]; then $_doso $_ztc listmoons; exit; fi # <-
 if [[ "$1" =~ ^(orb|orbit)$ ]]; then $_doso $_ztc orbit "$2" "$3"; exit; fi # <-- orbit
 if [[ "$1" =~ ^(dorb|deorbit)$ ]]; then $_doso $_ztc deorbit "$2"; exit; fi # <-- deorbit
 if [[ "$1" =~ ^(I|netstat)$ ]]; then input_id=$2; get_net_info; exit; fi # <-- network info
-if [[ "$1" =~ ^(qr|QR)$ ]]; then input_id=$2; nwqr; exit; fi # <-- qr code generation
+if [[ "$1" =~ ^(qr|QR)$ ]]; then input_id=$2; check4invalid__id; nwqr; exit; fi # <-- qr code generation
 if [[ "$1" =~ ^(h|H|help)$ ]]; then ztc_help; exit; fi # <-- help page
 [ ! -z "$1" ] && echo "[ ERROR: UNKNOWN OPTION. ] " && exit # <-- if nothing matched print error & exit
-# _launch
-function _launch { clear; _args=""; check_deps; check4installed_zerotier_client; init_status; recall__lcn; main_menu; }; _launch  # <--  ( //LAUNCH\\ )
