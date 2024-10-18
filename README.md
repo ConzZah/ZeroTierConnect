@@ -2,7 +2,7 @@
 
 <p align="center"> ZTC is a wrapper for zerotier-cli, with some added features: </p>
 
-<p align="center"> - a save-system (alias creation for network ids) with the goal of connecting faster by entering an alias instead of the id )</p>
+<p align="center"> - a save-system (alias creation for network ids) with the goal of being able to join / leave faster by entering an alias instead of the id </p>
 <p align="center"> - on-device qr code generation for network ids (using qrencode)</p>
 <p align="center"> - shorter commands</p>
 
