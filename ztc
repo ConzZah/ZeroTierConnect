@@ -1,23 +1,19 @@
 #!/usr/bin/env bash
   #===============================================
-  # Project: zerotier-connect_v0.7.2 / patch #4 
+  # Project: zerotier-connect_v0.7.2 / patch #5
   # Author:  ConzZah / ©️ 2024
-  # Last Modification: 17.10.24 / 16:54
+  # Last Modification: 18.10.24 / 19:36
   # https://github.com/ConzZah/ZeroTierConnect
   #===============================================
 # important vars:
-_doso="sudo"
-_home="/home/$USER"
-_ztc="zerotier-cli"
-_j="join"; _l="leave"
-_lnw="listnetworks"
-_qrencode="qrencode"
-_dmsg="[ ~~~ DONE ~~~ ]"
-_SAVED="$_home/ZTC_Save/SAVED_NETWORKS"
-mkdir -p "$_SAVED"; cd "$_SAVED"; t1="~~~~~~~~~~~~~~~~~~"
+_doso="sudo"; _ztc="zerotier-cli"; _j="join"; _l="leave"; _lnw="listnetworks"
+_qrencode="qrencode"; _dmsg="[ ~~~ DONE ~~~ ]"; t1="~~~~~~~~~~~~~~~~~~"
 _cr='\033[0m'; red='\033[0;31m'; green='\033[0;32m'; blue='\033[0;34m' # <-- basic colors
-if [ "$EUID" -eq 0 ]; then _home="/root"; fi # <-- if user is root, changes $_home from "/home/$USER" to "/root" ( this also means that root has it's own savedir )
-# determine package manager, set options where needed and run _ztcheck
+# set paths: 
+_home="/home/$USER"; [ "$EUID" -eq 0 ] && _home="/root" # <-- if EUID is 0 change $_home from "/home/$USER" to "/root" ( meaning: you'll have a seperate savedir if ran as root or with sudo)
+_SAVEDIR="$_home/ZTC_Save/SAVED_NETWORKS"; mkdir -p "$_SAVEDIR"; cd "$_SAVEDIR"
+_LCNDIR="$_home/ZTC_Save/.LCN"; mkdir -p "$_LCNDIR"
+# determine package manager & set options where needed:
 i=0; bin=("apt" "apk" "dnf" "yum" "pacman" "zypper" "brew"); pm=""; while [ $i -lt ${#bin[@]} ]; do
 if type -p "${bin[$i]}" > /dev/null; then pm="${bin[$i]}"; _add="$pm install"; break; fi; ((i++)); done
 if [[ "$pm" == "apk" ]]; then ! type -p sudo > /dev/null && _doso="doas"; _add="apk add"; _qrencode="libqrencode-tools"; fi
@@ -48,7 +44,7 @@ echo ""; echo "$_dlmsg"; echo ""; ZTinstall=$(curl -s https://install.zerotier.c
 echo ""; echo "$ZT_done_msg"; echo ""; read -r -n 1 -s; start_ztc
 }
 function ask2compile4alpine {
-echo "Do you want to start building the ZeroTier Client from Source?"; echo ""; echo "( BE AWARE: This could take some time."; echo ""
+echo "Do you want to start building the ZeroTier Client from Source?"; echo ""; echo "( BE AWARE: This could take some time. )"; echo ""
 echo "Y) BUILD FROM SOURCE"; echo "Q) EXIT"; read -r ask2compile4alpine
 case $ask2compile4alpine in 
 	Y|y) echo ""; compile4alpine;;
@@ -73,55 +69,61 @@ function Logo { clear
 echo "   .:*======= ConzZah's =======*:."
 echo " $t1$t1"
 echo " *     ZEROTIER-CONNECT v0.7.2      *"
-echo " $t1$t1"; status_screen
+echo " $t1$t1"
+status_screen
 }
 # status_screen
 function status_screen {
-cnbf="UNABLE TO FETCH. AUTHORIZED?"; if [[ "$actual_netname" == "$cnbf" ]]; then nameclr="$red"; else nameclr="$_cr"; fi; echo ""
+_utf="UNABLE TO FETCH."
+if [[ "$network_state" != "OK" ]]; then stateclr="$red"; else stateclr="$_cr"; fi
+[ -z "$network_name" ] && network_name="$_utf"; if [[ "$network_name" == "$_utf" ]]; then  nameclr="$red"; else nameclr="$_cr";fi
 echo "$t1$t1$t1"
 echo -e "[ NETWORK ID    : $input_id ]"
-echo -e "[ NETWORK NAME  : $nameclr$actual_netname$_cr ]"  
 echo -e "[ NETWORK ALIAS : $saved_alias ]"
-echo "$t1$t1$t1"; echo ""
+echo -e "[ NETWORK NAME  : $nameclr$network_name$_cr ]"  
+echo -e "[ NETWORK STATE : $stateclr$network_state$_cr ]"
+echo -e "$t1$t1$t1\n"
 }
 # init_status
-function init_status { input_id="/"; saved_alias="/"; actual_netname="/";}
+function init_status { input_id="/"; saved_alias="/"; network_name="/"; network_state="/";}
 # store__current_status <-- stores current status in backup variables so we can reload them in case a user error occurs.
 function store__current_status {
 input_id__current=$input_id
 saved_alias__current=$saved_alias
-actual_netname__current=$actual_netname
+network_name__current=$network_name
+network_state__current=$network_state
 }
 # recall__current_status <-- loads status values, previously stored with "store__current_status", back into their actual variables.
 function recall__current_status {
 input_id=$input_id__current
 saved_alias=$saved_alias__current
-actual_netname=$actual_netname__current
+network_name=$network_name__current
+network_state=$network_state__current
 }
 # store__lcn <-- stores last connected network values in .txt files to reload them when needed.
-function store__lcn {
-if [ ! -d $_home/ZTC_Save/.LCN ]; then mkdir .LCN; fi; cd $_home/ZTC_Save/.LCN
+function store__lcn { cd "$_LCNDIR"
 echo "$input_id" > .lcn__input_id.txt
 echo "$saved_alias" > .lcn__saved_alias.txt
-echo "$actual_netname" > .lcn__actual_netname.txt
+echo "$network_name" > .lcn__network_name.txt
+echo "$network_state" > .lcn__network_state.txt
 cd $_home/ZTC_Save/
 }
 # recall__lcn <-- recalls last connected network values into their variables
-function recall__lcn {
-if [ ! -d $_home/ZTC_Save/.LCN ]; then mkdir .LCN; init_status; fi; cd $_home/ZTC_Save/.LCN
+function recall__lcn { init_status; cd "$_LCNDIR"
 input_id=$(<.lcn__input_id.txt)
 saved_alias=$(<.lcn__saved_alias.txt)
-actual_netname=$(<.lcn__actual_netname.txt)
+network_name=$(<.lcn__network_name.txt)
+network_state=$(<.lcn__network_state.txt)
 cd $_home/ZTC_Save/
 }
-# fetch_network_details <-- fetches network name, rules & ip 
+# fetch_network_details <-- fetches network name, rules, status & ip 
 function fetch_network_details {
-fetch_cmd="$_doso $_ztc get $input_id name"
-echo "[ /// FETCHING NETWORK DETAILS.. ]"; echo ""; for net in {1..4}; do actual_netname=$($fetch_cmd); sleep 0.5; done # <-- fetching name 4 times 
-if [[ "$actual_netname" == "" ]]; then actual_netname="$cnbf"; fi
-# ^ if network name could not be fetched after 4 tries, update actual_netname & status_screen with: "NAME COULD NOT BE FETCHED."
-allow_dns_status=$($_doso $_ztc get $input_id allowDNS); allow_default_status=$($_doso $_ztc get $input_id allowDefault)
-allow_global_status=$($_doso $_ztc get $input_id allowGlobal); allow_managed_status=$($_doso $_ztc get $input_id allowManaged); ip_status=$($_doso $_ztc get $input_id ip)
+[ -z $args_present ] && echo "[ /// FETCHING NETWORK DETAILS.. ]" ||:
+for net in {1..4}; do network_name=$($_doso $_ztc get $input_id name); sleep 0.2; done # <-- fetching name 4 times
+# ^ if network name could not be fetched after 4 tries, update network_name & status_screen with: "NAME COULD NOT BE FETCHED."
+{ allow_dns_status=$($_doso $_ztc get $input_id allowDNS); allow_default_status=$($_doso $_ztc get $input_id allowDefault)
+allow_global_status=$($_doso $_ztc get $input_id allowGlobal); allow_managed_status=$($_doso $_ztc get $input_id allowManaged); 
+ip_status=$($_doso $_ztc get $input_id ip); network_state=$($_doso $_ztc get $input_id status) network_type=$($_doso $_ztc get $input_id type) ;}
 }
 # if_network_not_present__fail <-- will get triggered if $input_id is set to "/" or none at all.
 function if_network_not_present__fail {
@@ -141,7 +143,7 @@ _empty="[ YOU ENTERED NOTHING. ]"; doesnt_exist="[ ERROR: $saved_alias DOESN'T E
 if [ ! -z "$initial_run" ] && [[ "$saved_alias" =~ ^(q|Q)$ ]]; then clear; InitialRun; fi
 if [[ "$saved_alias" =~ ^(q|Q)$ ]]; then recall__current_status; return2main_menu; fi # <-- if user enters "q", quit to main menu
 if [[ "$saved_alias" == "" ]]; then echo "$_empty"; __BP; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # <-- if user enters nothing, shows error and lets them try again
-if [ ! -f "$_SAVED/$saved_alias.txt" ]; then echo "$doesnt_exist"; __BP; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # <-- if input does not match any saved networks, shows error and lets them try again
+if [ ! -f "$_SAVEDIR/$saved_alias.txt" ]; then echo "$doesnt_exist"; __BP; echo ""; read -r -n 1 -s; recall__current_status; Logo; $back2; fi # <-- if input does not match any saved networks, shows error and lets them try again
 }
 # pingtest <-- checks if your machine is connected to the internet by pinging zerotier.com before starting ztc
 function pingtest {
@@ -152,7 +154,7 @@ function ztc_help { cd $_home/ZTC_Save/; curl -s -L -O https://github.com/ConzZa
 # gen_alias_index_txt <-- generates alias_index.txt by displaying the contents of each savefile (the network id) alongside the filename (the alias).
 function gen_alias_index_txt {
 _index="alias_index.txt"; _desc="       ID          ALIAS"; _error="NO NETWORKS SAVED YET."
-if [ -z "$( ls "$_SAVED" )" ]; then _desc="$_error"; fi; echo "$_desc"; echo "" # <-- if savefolder is empty, assign $_error to _desc
+if [ -z "$( ls "$_SAVEDIR" )" ]; then _desc="$_error"; fi; echo "$_desc"; echo "" # <-- if savefolder is empty, assign $_error to _desc
 for network_alias in *.txt; do
 if [[ "$_desc" == "$_error" ]]; then break; fi
 network_id=$(cat "$network_alias"); echo "$network_id   $network_alias"|cut -d'.' -f1 >> raw_$_index
@@ -160,7 +162,7 @@ done; if [ -f raw_$_index ]; then sed '/^$/d' raw_$_index > $_index; cat $_index
 }
 # Connect
 function Connect {
-back2="Connect"; store__current_status; cd "$_SAVED"; ask4input="[  INPUT NETWORK ID OR ALIAS  ]"
+back2="Connect"; store__current_status; cd "$_SAVEDIR"; ask4input="[  INPUT NETWORK ID OR ALIAS  ]"
 if [[ "$initial_run" == "1" ]]; then ask4input="WELCOME TO ZTC, ENTER A NETWORK ID TO GET STARTED."; fi
 echo "/// CONNECT TO ZEROTIER NETWORK "
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
@@ -179,28 +181,31 @@ check4invalid__id # <-- makes sure that the given network id is valid, else comp
 }
 if [[ ${#input_id} -eq 16 ]]; then _id; else _alias; fi # <-- decide how to handle input
 echo -e "\n[ CONNECTING TO NETWORK ID: $input_id / ALIAS: $saved_alias ]\n"; echo "$t1"; $_doso $_ztc $_j $input_id; echo "$t1" # <-- connects 
-__BP; fetch_network_details; cd $_home/ZTC_Save/; store__lcn; store__current_status
-return2main_menu
+fetch_network_details; store__lcn; store__current_status; return2main_menu
 }
 # reconnect <-- refreshes connection to the currently selected network.
 function reconnect { if_network_not_present__fail; recall__lcn; check4invalid__id; fetch_network_details; store__lcn; echo "$_dmsg"; echo ""; return2main_menu ;}
-# disconnect
+# disconnect 
 function disconnect {
-if_network_not_present__fail; store__current_status
-echo "// DISCONNECT FROM NETWORK"
+store__current_status
+connected_networks=$($_doso $_ztc $_lnw|sed "1d"|cut -d ' ' -f 3) # <-- get currently connected networks 
+net_array=(0 $connected_networks) # <-- put them in 1 based array
+count=$(echo -n "$connected_networks"| grep -c '^') # <-- count lines
+[ "$count" -eq 0 ] && echo "ERROR: NO NETWORKS CONNECTED" && _r2main="manual" && return2main_menu 
+echo "/// DISCONNECT FROM NETWORK"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
-echo "DISCONNECT FROM $input_id ?"; echo ""; echo "[ Y / N ]"; echo ""; read -r disconnect
-case $disconnect in
-	y|Y) echo ""; echo "$t1"; $_doso $_ztc $_l $input_id; echo "$t1"; init_status; store__lcn; store__current_status; return2main_menu;;
-	N|n) echo ""; echo "CANCELED."; echo ""; recall__current_status; return2main_menu;;
-	q|Q) return2main_menu;;
-	*) Logo; disconnect
+echo "$connected_networks"|nl -b a 
+read -r dc; case $dc in
+	[1-$count]) echo "$t1"; sudo zerotier-cli leave "${net_array[$dc]}"; echo "$t1"
+	if [[ "${net_array[$dc]}" == "$input_id" ]] then init_status; store__lcn; store__current_status; fi;;
+	q|Q) return2main_menu;; 
+	*) echo "invalid option"
 esac
-init_status; store__lcn; return2main_menu
+return2main_menu
 }
 # DeleteSave
 function DeleteSave {
-back2="DeleteSave"; store__current_status; cd "$_SAVED"
+back2="DeleteSave"; store__current_status; cd "$_SAVEDIR"
 echo "/// DELETE SAVE ENTRY"
 echo "~~~~~~~~~~~~~~~~~~~~~~"; echo ""
 gen_alias_index_txt; echo ""; echo "[ ~~~ type network alias & press [ENTER] ~~~ ]"; echo ""; read -r saved_alias; echo ""
@@ -242,16 +247,17 @@ $_doso $_ztc peers|sed 's#200 peers##g'; echo ""; _r2main="manual"; return2main_
 function get_net_info {
 if_network_not_present__fail
 echo "// NETWORK INFO FOR $input_id:"
-echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 fetch_network_details
-echo "Network Name: $actual_netname"; echo ""
-echo "Network ID: $input_id"; echo ""
-echo "Network IP: $ip_status"; echo ""
-echo "#### NETWORK RULES: ####"; echo ""
-echo "Allow DNS: $allow_dns_status"; echo ""
-echo "Allow Default: $allow_default_status"; echo ""
-echo "Allow Global: $allow_global_status"; echo ""
-echo "Allow Managed: $allow_managed_status"; echo ""
+echo -e "\nNetwork Name: $network_name\n"
+echo -e "Network State: $network_state\n"
+echo -e "Network Type: $network_type\n"
+echo -e "Network IP: $ip_status\n"
+echo -e "#### NETWORK RULES: ####\n"
+echo -e "Allow DNS: $allow_dns_status\n"
+echo -e "Allow Default: $allow_default_status\n"
+echo -e "Allow Global: $allow_global_status\n"
+echo -e "Allow Managed: $allow_managed_status\n"
 _r2main="manual"; return2main_menu
 }
 # return2main_menu
@@ -298,11 +304,11 @@ esac
 __BP () { [ ! -z $args_present ] && exit ;} # <-- (lets us exit a function early if $args_present has any value)
 start_ztc () { clear; args_present=""; check_deps; check4installed_client; init_status; recall__lcn; main_menu; } # <--  start ztc in tui mode 
 [ -z "$1" ] && start_ztc && exit # <-- if there are no arguments, start_ztc
-[ ! -z "$1" ] && check4installed_client && args_present="x"  # <-- if there are, check4installed_client, set $args_present & continue
+[ ! -z "$1" ] && check4installed_client && args_present="x"; # <-- if there are, check4installed_client & set $args_present 
 if [[ "$1" == "-j" ]]; then _ztc="$_ztc -j"; shift; fi # <-- '-j' switch (enables JSON Output, usage: ztc -j [option] [network id/alias] )
 #### ARGUMENTS:
 if [[ "$1" =~ ^(c|C|j|J|join)$ ]]; then [ ${#2} -ne 16 ] && quickload=$2 && Connect || echo "$t1"; $_doso $_ztc $_j "$2"; echo "$t1"; exit; fi; # <-- join
-if [[ "$1" =~ ^(dc|DC|l|L|leave)$ ]]; then echo "$t1"; $_doso $_ztc $_l "$2"; echo "$t1"; exit; fi # <-- leave
+if [[ "$1" =~ ^(dc|DC|l|L|leave)$ ]]; then [ ${#2} -ne 16 ] && disconnect || echo "$t1"; $_doso $_ztc $_l "$2"; echo "$t1"; exit; fi # <-- leave
 if [[ "$1" =~ ^(i|info)$ ]]; then CheckClientInfo; exit; fi # <-- client info
 if [[ "$1" =~ ^(ln|LN|listnetworks)$ ]]; then $_doso $_ztc $_lnw; exit; fi # <-- listnetworks
 if [[ "$1" =~ ^(lp|LP|listpeers)$ ]]; then $_doso $_ztc listpeers; exit; fi # <-- listpeers
