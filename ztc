@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
   #===============================================
-  # Project: zerotier-connect_v0.7.2 / patch #7
+  # Project: zerotier-connect_v0.7.2 / patch #8
   # Author:  ConzZah / ©️ 2024
-  # Last Modification: 21.10.24 / 15:01
+  # Last Modification: 22.10.24 / 01:11
   # https://github.com/ConzZah/ZeroTierConnect
   #===============================================
 # important vars:
@@ -161,16 +161,14 @@ done; if [ -f raw_$_index ]; then sed '/^$/d' raw_$_index > $_index; cat $_index
 }
 # Connect
 function Connect {
-back2="Connect"; store__current_status
+check_ql; back2="Connect"; store__current_status
 cd "$_SAVEDIR"; ask4input="[  INPUT NETWORK ID OR ALIAS  ]"
 echo "/// CONNECT TO ZEROTIER NETWORK "
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
-[ -z $_ql ] && gen_index_txt && echo -e "$ask4input\n" && read -r input_id || input_id=$_ql
-# ^ if $_ql is empty continue as normal. if not, skip the above and copy value of $_ql to $input_id
-# (note that _ql only gets set when we enter something that's less than 16 chars)
+gen_index_txt; echo -e "$ask4input\n"; read -r input_id
 _id () {
-check4invalid__id; sc=$(grep $input_id *|sed 's#.txt##'|cut -d ':' -f 1) # <-- check if save entry (alias) for entered network id exists 
-[ ! -z "$sc" ] && saved_alias=$sc ||: # <-- if sc holds anything, load it's value into saved_alias <-- (alias found)
+check4invalid__id; sc=$(grep -s $input_id *.txt|sed 's#.txt##'|cut -d ':' -f 1) # <-- check if save entry (alias) for entered network id exists 
+[ ! -z "$sc" ] && saved_alias=$sc # <-- if sc holds anything, load it's value into saved_alias <-- (alias found)
 [ -z "$sc" ] && _create_new_save # <-- if sc holds nothing, prompt user to create new save <-- (alias not found)
 }
 _alias () {
@@ -190,15 +188,14 @@ fetch_network_details; store__lcn; store__current_status; return2main_menu
 function Reconnect { if_network_not_present__fail; recall__lcn; check4invalid__id; fetch_network_details; store__lcn; echo "$_dmsg"; echo ""; return2main_menu ;}
 # Disconnect
 function Disconnect {
-store__current_status
-[ ! -z $_ql ] && cd "$SAVEDIR" && saved_alias=$_ql && check4invalid__alias && _ql=$(<$saved_alias.txt) && echo "$t1" && $_doso $_ztc $_l "$_ql" && echo "$t1" && return2main_menu
+check_ql; back2="Disconnect"; store__current_status
 # ^ if $_ql is NOT empty, assume an alias was entered & run checks, else ignore & continue
 connected_networks=$($_doso $_ztc $_lnw|sed "1d"|cut -d ' ' -f 3) # <-- get currently connected networks 
 net_array=(0 $connected_networks) # <-- put them in 1 based array
 count=$(echo -n "$connected_networks"| grep -c '^') # <-- count lines
 [ "$count" -eq 0 ] && echo "ERROR: NO NETWORKS CONNECTED" && _r2main="manual" && return2main_menu 
-echo "/// DISCONNECT FROM NETWORK"
-echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
+echo "/// DISCONNECT FROM ZEROTIER NETWORK"
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
 echo "$connected_networks"|nl -b a
 read -r dc; case $dc in
 	[1-$count]) echo "$t1"; $_doso $_ztc $_l "${net_array[$dc]}"; echo "$t1"
@@ -307,14 +304,16 @@ case $main_menu in
 esac
 }
 __BP () { [ ! -z $args_present ] && exit ;} # <-- (lets us exit a function early if $args_present has any value)
+check_ql () { [ ! -z $_ql ] && cd "$SAVEDIR" && saved_alias=$_ql && check4invalid__alias && _ql=$(<$saved_alias.txt) && echo "$t1" && $_doso $_ztc $_x "$_ql" && echo "$t1" && return2main_menu ;}
 start_ztc () { clear; args_present=""; check_deps; check4installed_client; init_status; recall__lcn; main_menu; } # <--  start ztc in tui mode 
 [ -z "$1" ] && start_ztc && exit # <-- if there are no arguments, start_ztc
 [ ! -z "$1" ] && check4installed_client && args_present="x"; # <-- if there are, check4installed_client & set $args_present 
 if [[ "$1" == "-j" ]]; then _ztc="$_ztc -j"; shift; fi # <-- '-j' switch (enables JSON Output, usage: ztc -j [option] [network id/alias] )
 #### ARGUMENTS:
-_ql="" # (note: _ql stands for both quickload and quickleave)
-if [[ "$1" =~ ^(c|C|j|J|join)$ ]]; then [ ${#2} -ne 16 ] && _ql=$2 && Connect || echo "$t1"; $_doso $_ztc $_j "$2"; echo "$t1"; exit; fi; # <-- join
-if [[ "$1" =~ ^(dc|DC|l|L|leave)$ ]]; then [ ${#2} -ne 16 ] && _ql=$2 && Disconnect || echo "$t1"; $_doso $_ztc $_l "$2"; echo "$t1"; exit; fi # <-- leave
+_ql=""; _x="" # (_ql stands for both quickload and quickleave, _x specifies action (join / leave)) 
+# ^ note that _ql only gets set when we enter something that's less than 16 chars. (meaning: anything that's not the length of a network-id, will be treated as alias and checked for validity)
+if [[ "$1" =~ ^(c|C|j|J|join)$ ]]; then [ ${#2} -ne 16 ] && _ql=$2 && _x=$_j && Connect || echo "$t1"; $_doso $_ztc $_j "$2"; echo "$t1"; exit; fi; # <-- join
+if [[ "$1" =~ ^(dc|DC|l|L|leave)$ ]]; then [ ${#2} -ne 16 ] && _ql=$2 && _x=$_l && Disconnect || echo "$t1"; $_doso $_ztc $_l "$2"; echo "$t1"; exit; fi # <-- leave
 if [[ "$1" =~ ^(i|info)$ ]]; then CheckClientInfo; exit; fi # <-- client info
 if [[ "$1" =~ ^(ln|LN|listnetworks)$ ]]; then $_doso $_ztc $_lnw; exit; fi # <-- listnetworks
 if [[ "$1" =~ ^(lp|LP|listpeers)$ ]]; then $_doso $_ztc listpeers; exit; fi # <-- listpeers
