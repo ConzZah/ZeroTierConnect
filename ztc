@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
   #===============================================
-  # Project: zerotier-connect_v0.7.2 / patch #6
+  # Project: zerotier-connect_v0.7.2 / patch #7
   # Author:  ConzZah / ©️ 2024
-  # Last Modification: 18.10.24 / 21:37
+  # Last Modification: 21.10.24 / 15:01
   # https://github.com/ConzZah/ZeroTierConnect
   #===============================================
 # important vars:
@@ -150,9 +150,9 @@ echo "CHECKING NETWORK CONNECTION.."; echo ""; if ping -q -i 0.5 -c 2 -w 7 zerot
 clear; echo "YOU'RE OFFLINE. CHECK YOUR CONNECTION & TRY AGAIN."; echo ""; echo "EXITING IN 3 SECONDS.."; echo ""; sleep 3; exit; fi; }
 # ztc_help <-- ZTC help / manual page
 function ztc_help { cd $_home/ZTC_Save/; curl -s -L -O https://github.com/ConzZah/ZeroTierConnect/raw/main/ztc_helppage.txt; less ztc_helppage.txt; rm ztc_helppage.txt; return2main_menu; }
-# gen_alias_index_txt <-- generates alias_index.txt by displaying the contents of each savefile (the network id) alongside the filename (the alias).
-function gen_alias_index_txt {
-_index="alias_index.txt"; _desc="       ID          ALIAS"; _error="NO NETWORKS SAVED YET."
+# gen_index_txt <-- generates index.txt by displaying the contents of each savefile (the network id) alongside the filename (the alias).
+function gen_index_txt {
+_index="index.txt"; _desc="       ID          ALIAS"; _error="NO NETWORKS SAVED YET."
 if [ -z "$( ls "$_SAVEDIR" )" ]; then _desc="$_error"; fi; echo "$_desc"; echo "" # <-- if savefolder is empty, assign $_error to _desc
 for network_alias in *.txt; do
 if [[ "$_desc" == "$_error" ]]; then break; fi
@@ -165,19 +165,22 @@ back2="Connect"; store__current_status
 cd "$_SAVEDIR"; ask4input="[  INPUT NETWORK ID OR ALIAS  ]"
 echo "/// CONNECT TO ZEROTIER NETWORK "
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; echo ""
-[ -z $_ql ] && gen_alias_index_txt && echo -e "$ask4input\n" && read -r input_id || input_id=$_ql
+[ -z $_ql ] && gen_index_txt && echo -e "$ask4input\n" && read -r input_id || input_id=$_ql
 # ^ if $_ql is empty continue as normal. if not, skip the above and copy value of $_ql to $input_id
 # (note that _ql only gets set when we enter something that's less than 16 chars)
 _id () {
-check4invalid__id; savecheck=$(find -maxdepth 1 -name '*.txt' -exec grep -l $input_id {} +); sc="sc.txt" # ( check if entered network id is already saved and if so, load corresponding alias )
-if [[ $savecheck == *"./"* ]]; then echo "$savecheck" > $sc; sed -i "s#.txt##g" $sc; sed -i "s#./##g" $sc; saved_alias=$(<$sc); rm $sc; # <-- ( loads found alias into $saved_alias )
-else echo ""; echo "[ ~~~ enter alias for $input_id, to save this network ~~~ ]"; echo ""; read -r saved_alias; echo "" # <-- ( if the id should not be found in any savefile, prompt user to enter an alias & create new save entry. )
-echo "$input_id" > $saved_alias.txt; echo "[ .:SAVE CREATED:. ]"; sleep 0.4; fi # <-- stores network id in .txt <-- ( writes save )
+check4invalid__id; sc=$(grep $input_id *|sed 's#.txt##'|cut -d ':' -f 1) # <-- check if save entry (alias) for entered network id exists 
+[ ! -z "$sc" ] && saved_alias=$sc ||: # <-- if sc holds anything, load it's value into saved_alias <-- (alias found)
+[ -z "$sc" ] && _create_new_save # <-- if sc holds nothing, prompt user to create new save <-- (alias not found)
 }
 _alias () {
-saved_alias=$input_id; check4invalid__alias # if alias was entered, check if it exists.
+saved_alias=$input_id; check4invalid__alias # <-- if alias was entered, check if it's valid
 input_id=$(<$saved_alias.txt) # <-- loads content of $saved_alias.txt into $input_id. <-- ( loads save )
-check4invalid__id # <-- makes sure that the given network id is valid, else complains.
+check4invalid__id # <-- makes sure that the loaded network id is valid, else complains.
+}
+_create_new_save () {
+echo -e "\n[ ~~~ ENTER ALIAS TO SAVE '$input_id' ~~~ ]\n"; read -r saved_alias
+echo "$input_id" > $saved_alias.txt; echo -e "\n[ .:SAVE CREATED:. ]"; sleep 0.2 # <-- stores network id in .txt <-- ( writes save )
 }
 if [[ ${#input_id} -eq 16 ]]; then _id; else _alias; fi # <-- decide how to handle input
 echo -e "\n[ CONNECTING TO NETWORK ID: $input_id / ALIAS: $saved_alias ]\n"; echo "$t1"; $_doso $_ztc $_j $input_id; echo "$t1" # <-- connects 
@@ -210,7 +213,7 @@ function DeleteSave {
 back2="DeleteSave"; store__current_status; cd "$_SAVEDIR"
 echo "/// DELETE SAVE ENTRY"
 echo "~~~~~~~~~~~~~~~~~~~~~~"; echo ""
-gen_alias_index_txt; echo ""; echo "[ ~~~ type network alias & press [ENTER] ~~~ ]"; echo ""; read -r saved_alias; echo ""
+gen_index_txt; echo ""; echo "[ ~~~ type network alias & press [ENTER] ~~~ ]"; echo ""; read -r saved_alias; echo ""
 check4invalid__alias; echo ""; echo "ARE YOU SURE YOU WANT TO DELETE $saved_alias ?"; echo ""; echo "[ Y / N ]"; echo ""; read -r DeleteSave
 case $DeleteSave in
 	Y|y) _dl=$(<$saved_alias.txt); $_doso $_ztc $_l $_dl >/dev/null 2>&1; rm "$saved_alias.txt"; echo -e "\n$saved_alias has been deleted."; recall__current_status
